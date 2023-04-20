@@ -94,20 +94,20 @@ class MyTeamAgent(AutonomousAgent):
 
             self._agent.set_global_plan(plan)
 
-            blueprint_library = CarlaDataProvider.get_world().get_blueprint_library()
-            bp = blueprint_library.filter("model3")[0]
-            transform = carla.Transform(carla.Location(x=230, y=195, z=40), carla.Rotation(yaw=180))
+            #blueprint_library = CarlaDataProvider.get_world().get_blueprint_library()
+            #bp = blueprint_library.filter("model3")[0]
+            #transform = carla.Transform(carla.Location(x=230, y=195, z=40), carla.Rotation(yaw=180))
             #spawn_point.location = CarlaDataProvider.get_world().get_random_location_from_navigation()       
-            vehicle = CarlaDataProvider.get_world().spawn_actor(bp, transform)
+            #vehicle = CarlaDataProvider.get_world().spawn_actor(bp, transform)
 
             return carla.VehicleControl()
 
         else:
             # Release other vehicles 
-            vehicle_list = CarlaDataProvider.get_world().get_actors().filter("*vehicle*")
-            for actor in vehicle_list:
-                if not('role_name' in actor.attributes and actor.attributes['role_name'] == 'hero'):
-                    actor.destroy()
+            #vehicle_list = CarlaDataProvider.get_world().get_actors().filter("*vehicle*")
+            #for actor in vehicle_list:
+                #if not('role_name' in actor.attributes and actor.attributes['role_name'] == 'hero'):
+                    #actor.destroy()
             
             controls = self._agent.run_step()
             if self.__show:
