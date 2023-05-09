@@ -10,7 +10,7 @@ This module provides an NPC agent to control the ego vehicle
 from __future__ import print_function
 
 import carla
-from basic_agent import BasicAgent
+from behavior_agent import BehaviorAgent
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 import importlib
 
@@ -66,6 +66,13 @@ class MyTeamAgent(AutonomousAgent):
         ]
         """
         return self.configs["sensors"]
+    
+    def set_global_plan(self, global_plan_gps, global_plan_world_coord):
+        """
+        Set the plan (route) for the agent
+        """
+        self._global_plan_world_coord = global_plan_world_coord
+        self._global_plan = global_plan_gps
 
     def run_step(self, input_data, timestamp):
         """
@@ -82,33 +89,15 @@ class MyTeamAgent(AutonomousAgent):
             if not hero_actor:
                 return carla.VehicleControl()
             
-            self._agent = BasicAgent(hero_actor, opt_dict=self.configs)
+            self._agent = BehaviorAgent(hero_actor, opt_dict=self.configs)
 
-            plan = []
-            prev_wp = None
-            for transform, _ in self._global_plan_world_coord:
-                wp = CarlaDataProvider.get_map().get_waypoint(transform.location)
-                if prev_wp:
-                    plan.extend(self._agent.trace_route(prev_wp, wp))
-                prev_wp = wp
+            plan = [(CarlaDataProvider.get_map().get_waypoint(x[0].location),x[1]) for x in self._global_plan_world_coord]
 
             self._agent.set_global_plan(plan)
-
-            #blueprint_library = CarlaDataProvider.get_world().get_blueprint_library()
-            #bp = blueprint_library.filter("model3")[0]
-            #transform = carla.Transform(carla.Location(x=230, y=195, z=40), carla.Rotation(yaw=180))
-            #spawn_point.location = CarlaDataProvider.get_world().get_random_location_from_navigation()       
-            #vehicle = CarlaDataProvider.get_world().spawn_actor(bp, transform)
 
             return carla.VehicleControl()
 
         else:
-            # Release other vehicles 
-            vehicle_list = CarlaDataProvider.get_world().get_actors().filter("*vehicle*")
-            for actor in vehicle_list:
-                if not('role_name' in actor.attributes and actor.attributes['role_name'] == 'hero'):
-                    actor.destroy()
-            
             controls = self._agent.run_step()
             if self.__show:
                 self.showServer.send_frame("RGB", input_data["Center"][1])
