@@ -144,7 +144,9 @@ class BehaviorAgent(BasicAgent):
 
         vehicle_list = self._world.get_actors().filter("*vehicle*")
         def dist(v): return v.get_location().distance(waypoint.transform.location)
-        vehicle_list = [v for v in vehicle_list if dist(v) < 45 and v.id != self._vehicle.id]
+        #vehicle_list = [v for v in vehicle_list if dist(v) < 45 and v.id != self._vehicle.id]
+        for v in vehicle_list:
+            print("ID: ", v.id, "dist: ", dist(v), "dist with compute distance:", compute_distance(v.get_location(), self._vehicle.get_transform().location))
 
         if self._direction == RoadOption.CHANGELANELEFT:
             vehicle_state, vehicle, distance = self._vehicle_obstacle_detected( #object_obstacle_detected in realtà
@@ -157,12 +159,13 @@ class BehaviorAgent(BasicAgent):
         else:
             vehicle_state, vehicle, distance = self._vehicle_obstacle_detected(
                 vehicle_list, max(
-                    self._behavior.min_proximity_threshold, self._speed_limit / 3), up_angle_th=30)
+                    self._behavior.min_proximity_threshold, self._speed_limit / 3), up_angle_th=60)
 
             # Check for tailgating: utile quando si parte da bordo strada e ci si deve intromettere
             if not vehicle_state and self._direction == RoadOption.LANEFOLLOW \
                     and not waypoint.is_junction and self._speed > 10 \
                     and self._behavior.tailgate_counter == 0:
+                print("tailgating from collision and car avoidance manager")
                 self._tailgating(waypoint, vehicle_list)
 
         return vehicle_state, vehicle, distance
@@ -256,9 +259,12 @@ class BehaviorAgent(BasicAgent):
 
         # 1: Red lights and stops behavior
         if self.traffic_light_manager():
+            print("RED LIGHTS")
             return self.emergency_stop()
 
-        # 2.1: Pedestrian avoidance behaviors
+        
+        
+        """# 2.1: Pedestrian avoidance behaviors
         walker_state, walker, w_distance = self.pedestrian_avoid_manager(ego_vehicle_wp)
 
         if walker_state:
@@ -270,8 +276,9 @@ class BehaviorAgent(BasicAgent):
 
             # Emergency brake if the car is very close.
             if distance < self._behavior.braking_distance:
+                print("TOO CLOSE to pedestrian, distance = ", distance, "ID: ", walker.id)
                 return self.emergency_stop()
-
+"""
         # 2.2: Car following behaviors
         vehicle_state, vehicle, distance = self.collision_and_car_avoid_manager(ego_vehicle_wp)
 
@@ -284,8 +291,10 @@ class BehaviorAgent(BasicAgent):
 
             # Emergency brake if the car is very close.
             if distance < self._behavior.braking_distance:
+                print("TOO CLOSE to car, distance = ", distance, "ID: ", vehicle.id)
                 return self.emergency_stop()
             else:
+                print("NOT TOO CLOSE to car, distance = ", distance, "ID: ", vehicle.id)
                 control = self.car_following_manager(vehicle, distance)
 
         # 3: Intersection behavior (non c'è molta differenza con il normal behavior perchà e gestito in _vehicle_obstacle_detected)
@@ -313,6 +322,7 @@ class BehaviorAgent(BasicAgent):
 
             :param speed (carl.VehicleControl): control to be modified
         """
+        print("EMERGENCY STOP")
         control = carla.VehicleControl()
         control.throttle = 0.0
         control.brake = self._max_brake

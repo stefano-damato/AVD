@@ -64,15 +64,9 @@ class VehicleController():
             :return: distance (in meters) to the waypoint
         """
 
-        acceleration = self._lon_controller.run_step(target_speed)
-        current_steering = self._lat_controller.run_step()
         control = carla.VehicleControl()
-        if acceleration >= 0.0:
-            control.throttle = min(acceleration, self.max_throt)
-            control.brake = 0.0
-        else:
-            control.throttle = 0.0
-            control.brake = min(abs(acceleration), self.max_brake)
+        
+        current_steering = self._lat_controller.run_step()
 
         # Steering regulation: changes cannot happen abruptly, can't steer too much.
         if current_steering > self.past_steering + 0.1:
@@ -90,6 +84,20 @@ class VehicleController():
         control.manual_gear_shift = False
         self.past_steering = steering
 
+        # smoothe curves
+        if abs(control.steer) > 0.1:
+            target_speed = target_speed/2
+        
+        acceleration = self._lon_controller.run_step(target_speed)
+
+        if acceleration >= 0.0:
+            control.throttle = min(acceleration, self.max_throt)
+            control.brake = 0.0
+        else:
+            control.throttle = 0.0
+            control.brake = min(abs(acceleration), self.max_brake)
+
+        print("speed: ", get_speed(self._vehicle), "steering: ", steering)
         return control
 
 

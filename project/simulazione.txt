@@ -2,6 +2,11 @@ scenario 1
 non rileva il coso che sta sulla strada
 
 scenario 0
+- nella prima curva rileva l'auto solo se _vehicle_obstacle_detected (in basic_agent) è chiamato da pedestrian_avoid_manager 
+(infatti l'auto viene rilevata come pedestrian). Tra le due chiamate è diverso up_angle_th: in pedestrian_avoid_manager è 60,
+mentre in collision_and_car_avoid_manager è 30; per far funzionare le cose correttamente abbiamo modificato quest'ultimo a 60;
+
+- dopo questa curva, quando l'auto scompare non viene più rilevata ma non partiamo se non dopo un bel po' (è in normal behaviour con target speed 27)
 
 scenario 2
 non sorpassa rimane fermo dietro la prima macchina; non entra nel metodo collision_and_car_avoid_manager - comportamento giusto (?)
