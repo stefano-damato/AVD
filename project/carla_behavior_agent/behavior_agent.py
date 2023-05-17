@@ -79,6 +79,9 @@ class BehaviorAgent(BasicAgent):
             steps=self._look_ahead_steps)
         if self._incoming_direction is None:
             self._incoming_direction = RoadOption.LANEFOLLOW
+        
+        """self._behavior.braking_distance = (self._speed/10)**2
+        print("Current velocity: ",self._speed,", Security distance: ", self._behavior.braking_distance)"""
 
     def traffic_light_manager(self):
         """
@@ -130,6 +133,37 @@ class BehaviorAgent(BasicAgent):
                     self.set_destination(end_waypoint.transform.location,
                                          left_wpt.transform.location)
 
+    def static_object_avoid_manager(self, waypoint):
+        """
+        This module is in charge of warning in case of a collision
+        with a static object.
+
+            :param location: current location of the agent
+            :param waypoint: current waypoint of the agent
+            :return vehicle_state: True if there is a vehicle nearby, False if not
+            :return vehicle: nearby vehicle
+            :return distance: distance to nearby vehicle
+        """
+
+        ob_list = self._world.get_actors().filter("*static.prop.trafficwarning*")
+        def dist(ob): return ob.get_location().distance(waypoint.transform.location)
+        ob_list = [ob for ob in ob_list if dist(ob) < 20]      #considera solo gli oggetti a distanza minore di 10
+        for ob in ob_list:
+            print(ob.type_id)
+
+        if self._direction == RoadOption.CHANGELANELEFT:
+            ob_state, ob_detected, distance = self._vehicle_obstacle_detected(ob_list, max(
+                self._behavior.min_proximity_threshold, self._speed_limit / 2), up_angle_th=90, lane_offset=-1)
+        elif self._direction == RoadOption.CHANGELANERIGHT:
+            ob_state, ob_detected, distance = self._vehicle_obstacle_detected(ob_list, max(
+                self._behavior.min_proximity_threshold, self._speed_limit / 2), up_angle_th=90, lane_offset=1)
+        else:
+            ob_state, ob_detected, distance = self._vehicle_obstacle_detected(ob_list, max(
+                self._behavior.min_proximity_threshold, self._speed_limit / 3), up_angle_th=60)
+            print(ob_state, ob_detected, distance)
+
+        return ob_state, ob_detected, distance
+
     def collision_and_car_avoid_manager(self, waypoint):
         """
         This module is in charge of warning in case of a collision
@@ -143,30 +177,40 @@ class BehaviorAgent(BasicAgent):
         """
 
         vehicle_list = self._world.get_actors().filter("*vehicle*")
-        def dist(v): return v.get_location().distance(waypoint.transform.location)
-        #vehicle_list = [v for v in vehicle_list if dist(v) < 45 and v.id != self._vehicle.id]
-        for v in vehicle_list:
-            print("ID: ", v.id, "dist: ", dist(v), "dist with compute distance:", compute_distance(v.get_location(), self._vehicle.get_transform().location))
+        static_ob_list = self._world.get_actors().filter("*static*")
 
+        def dist(v): return v.get_location().distance(waypoint.transform.location)
+
+        safety_distance = max(45, 2*(get_speed(self._vehicle)/10)**2)
+
+        ob_list = [v for v in vehicle_list if dist(v) < safety_distance and v.id != self._vehicle.id]
+        for v in static_ob_list:
+            if dist(v) < 45:
+                ob_list.append(v)
+
+        ob_list.sort(key=lambda x:dist(x))
+        
         if self._direction == RoadOption.CHANGELANELEFT:
             vehicle_state, vehicle, distance = self._vehicle_obstacle_detected( #object_obstacle_detected in realtà
-                vehicle_list, max(
+                ob_list, max(
                     self._behavior.min_proximity_threshold, self._speed_limit / 2), up_angle_th=180, lane_offset=-1)
         elif self._direction == RoadOption.CHANGELANERIGHT:
             vehicle_state, vehicle, distance = self._vehicle_obstacle_detected(
-                vehicle_list, max(
+                ob_list, max(
                     self._behavior.min_proximity_threshold, self._speed_limit / 2), up_angle_th=180, lane_offset=1)
         else:
             vehicle_state, vehicle, distance = self._vehicle_obstacle_detected(
-                vehicle_list, max(
+                ob_list, max(
                     self._behavior.min_proximity_threshold, self._speed_limit / 3), up_angle_th=60)
+            
+            print(vehicle_state, vehicle, distance)
 
             # Check for tailgating: utile quando si parte da bordo strada e ci si deve intromettere
             if not vehicle_state and self._direction == RoadOption.LANEFOLLOW \
                     and not waypoint.is_junction and self._speed > 10 \
                     and self._behavior.tailgate_counter == 0:
                 print("tailgating from collision and car avoidance manager")
-                self._tailgating(waypoint, vehicle_list)
+                self._tailgating(waypoint, ob_list)
 
         return vehicle_state, vehicle, distance
 
@@ -215,29 +259,34 @@ class BehaviorAgent(BasicAgent):
 
         # Under safety time distance, slow down.
         if self._behavior.safety_time > ttc > 0.0:
+            print("Under safety time distance")
             target_speed = min([
                 positive(vehicle_speed - self._behavior.speed_decrease), # riduco la velocità di self._behavior.speed_decrease
                 self._behavior.max_speed,
                 self._speed_limit - self._behavior.speed_lim_dist])
             self._local_planner.set_speed(target_speed)
-            control = self._local_planner.run_step(debug=debug)
+            #control = self._local_planner.run_step(debug=debug)
 
         # Actual safety distance area, try to follow the speed of the vehicle in front.
         elif 2 * self._behavior.safety_time > ttc >= self._behavior.safety_time:
+            print("Actual safety time distance")
             target_speed = min([
                 max(self._min_speed, vehicle_speed),
                 self._behavior.max_speed,
                 self._speed_limit - self._behavior.speed_lim_dist])
             self._local_planner.set_speed(target_speed)
-            control = self._local_planner.run_step(debug=debug)
+            #control = self._local_planner.run_step(debug=debug)
 
         # Normal behavior.
         else:
+            print("Normal behavior")
             target_speed = min([
                 self._behavior.max_speed,
                 self._speed_limit - self._behavior.speed_lim_dist])
             self._local_planner.set_speed(target_speed)
-            control = self._local_planner.run_step(debug=debug)
+        
+        print("Target speed after car_following_manager: ", target_speed)
+        control = self._local_planner.run_step(debug=debug)
 
         return control
 
@@ -264,7 +313,7 @@ class BehaviorAgent(BasicAgent):
 
         
         
-        """# 2.1: Pedestrian avoidance behaviors
+        # 2.1: Pedestrian avoidance behaviors
         walker_state, walker, w_distance = self.pedestrian_avoid_manager(ego_vehicle_wp)
 
         if walker_state:
@@ -278,8 +327,28 @@ class BehaviorAgent(BasicAgent):
             if distance < self._behavior.braking_distance:
                 print("TOO CLOSE to pedestrian, distance = ", distance, "ID: ", walker.id)
                 return self.emergency_stop()
-"""
-        # 2.2: Car following behaviors
+
+        # 2.2: Static object avoidance behaviors
+        """ob_state, ob_detected, ob_distance = self.static_object_avoid_manager(ego_vehicle_wp)
+
+        if ob_state:
+            # Distance is computed from the center of the two cars,
+            # we use bounding boxes to calculate the actual distance
+            distance = ob_distance - max(
+                ob_detected.bounding_box.extent.y, ob_detected.bounding_box.extent.x) - max(
+                    self._vehicle.bounding_box.extent.y, self._vehicle.bounding_box.extent.x)
+
+            print("distance in run_step: ", distance, ob_distance)
+
+            # Emergency brake if the car is very close.
+            if distance < self._behavior.braking_distance:
+                print("TOO CLOSE to static object, distance = ", distance, "ID: ", ob_detected.id)
+                return self.emergency_stop()
+            else:
+                control = self.car_following_manager(ob_detected, distance)"""
+
+
+        # 2.3: Car following behaviors
         vehicle_state, vehicle, distance = self.collision_and_car_avoid_manager(ego_vehicle_wp)
 
         if vehicle_state:
@@ -291,10 +360,9 @@ class BehaviorAgent(BasicAgent):
 
             # Emergency brake if the car is very close.
             if distance < self._behavior.braking_distance:
-                print("TOO CLOSE to car, distance = ", distance, "ID: ", vehicle.id)
+                print("TOO CLOSE to vechicle, distance = ", distance, "ID: ", vehicle.id)
                 return self.emergency_stop()
             else:
-                print("NOT TOO CLOSE to car, distance = ", distance, "ID: ", vehicle.id)
                 control = self.car_following_manager(vehicle, distance)
 
         # 3: Intersection behavior (non c'è molta differenza con il normal behavior perchà e gestito in _vehicle_obstacle_detected)
@@ -312,6 +380,7 @@ class BehaviorAgent(BasicAgent):
                 self._speed_limit - self._behavior.speed_lim_dist])
             self._local_planner.set_speed(target_speed)
             control = self._local_planner.run_step(debug=debug)
+
 
         return control
 

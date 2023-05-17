@@ -1,12 +1,19 @@
 scenario 1
-non rileva il coso che sta sulla strada
+-non rileva il coso che sta sulla strada; risolto filtrando nel metodo collision_and_car_avoid_manager anche sugli oggetti statici,
+ordinando la lista ottenuta per distanza
+-modificata la distanza massima a cui rileva oggetti/veicoli che cambia a run time in base alla nostra velocità (con un minimo
+fisso di 45 m)
 
 scenario 0
 - nella prima curva rileva l'auto solo se _vehicle_obstacle_detected (in basic_agent) è chiamato da pedestrian_avoid_manager 
 (infatti l'auto viene rilevata come pedestrian). Tra le due chiamate è diverso up_angle_th: in pedestrian_avoid_manager è 60,
 mentre in collision_and_car_avoid_manager è 30; per far funzionare le cose correttamente abbiamo modificato quest'ultimo a 60;
 
-- dopo questa curva, quando l'auto scompare non viene più rilevata ma non partiamo se non dopo un bel po' (è in normal behaviour con target speed 27)
+- dopo questa curva, quando l'auto scompare non viene più rilevata ma non partiamo se non dopo un bel po' (è in normal behaviour 
+con target speed 27); risolto inserendo il controllo nel controllore che se la sterzata è maggiore di 0.1 e la velocità è maggiore
+di 10, la velocità viene dimezzata;
+
+
 
 scenario 2
 non sorpassa rimane fermo dietro la prima macchina; non entra nel metodo collision_and_car_avoid_manager - comportamento giusto (?)

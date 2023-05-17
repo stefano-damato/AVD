@@ -433,19 +433,11 @@ class BasicAgent(object):
         if self._ignore_vehicles:
             return (False, None, -1)
 
-        vehicle_list1 = self._world.get_actors().filter("*vehicle*")
-        """if not vehicle_list:
+        if not vehicle_list:
             #vehicle_list = self._world.get_actors().filter("*vehicle*")
-            (False, None, -1)"""
+            (False, None, -1)
 
         def dist(v): return v.get_location().distance(self._map.get_waypoint(self._vehicle.get_location()).transform.location)
-        vehicle_list = [v for v in vehicle_list if dist(v) < 45 and v.id != self._vehicle.id]
-
-        for v in vehicle_list1:
-            print("lista completa: ID vehicle ob det: ", v.id)
-
-        for v in vehicle_list:
-            print("ID vehicle ob det: ", v.id)
 
         if not max_distance:
             max_distance = self._base_vehicle_threshold
@@ -465,8 +457,9 @@ class BasicAgent(object):
             x=ego_extent * ego_forward_vector.x,
             y=ego_extent * ego_forward_vector.y,
         )
-
+        print("INSIDE _vehicle_obstacle_detected")
         for target_vehicle in vehicle_list:
+            print(target_vehicle.type_id,target_vehicle.id)
             target_transform = target_vehicle.get_transform() #dove si trova il veicolo
             target_wpt = self._map.get_waypoint(target_transform.location, lane_type=carla.LaneType.Any) #acquisisci la posizione in forma di waypoint perchè dà informazioni anche sulla corsia
 

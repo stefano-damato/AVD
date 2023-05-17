@@ -85,8 +85,10 @@ class VehicleController():
         self.past_steering = steering
 
         # smoothe curves
-        if abs(control.steer) > 0.1:
+        if abs(control.steer) > 0.1 and get_speed(self._vehicle) > 10:
             target_speed = target_speed/2
+
+        print("target speed controller: ", target_speed)
         
         acceleration = self._lon_controller.run_step(target_speed)
 
