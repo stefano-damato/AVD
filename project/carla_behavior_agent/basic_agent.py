@@ -242,21 +242,22 @@ class BasicAgent(object):
         Use 'direction' to specify either a 'left' or 'right' lane change,
         and the other 3 fine tune the maneuver
         """
-        speed = self._vehicle.get_velocity().length()
+        speed = get_speed(self._vehicle)    # self._vehicle.get_velocity().length()
         path = self._generate_lane_change_path(
             self._map.get_waypoint(self._vehicle.get_location()),
             direction,
             same_lane_time * speed,
             other_lane_time * speed,
             lane_change_time * speed,
-            False,
+            True,
             1,
             self._sampling_resolution
         )
-        if not path:
+        if path:
+            print("path found for the lane change")
+            self.set_global_plan(path)
+        else:
             print("WARNING: Ignoring the lane change as no path was found")
-
-        self.set_global_plan(path)
 
     def _affected_by_traffic_light(self, lights_list=None, max_distance=None):
         """
@@ -459,7 +460,6 @@ class BasicAgent(object):
         )
         print("INSIDE _vehicle_obstacle_detected")
         for target_vehicle in vehicle_list:
-            print(target_vehicle.type_id,target_vehicle.id)
             target_transform = target_vehicle.get_transform() #dove si trova il veicolo
             target_wpt = self._map.get_waypoint(target_transform.location, lane_type=carla.LaneType.Any) #acquisisci la posizione in forma di waypoint perchè dà informazioni anche sulla corsia
 

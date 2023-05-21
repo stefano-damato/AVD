@@ -203,8 +203,6 @@ class BehaviorAgent(BasicAgent):
                 ob_list, max(
                     self._behavior.min_proximity_threshold, self._speed_limit / 3), up_angle_th=60)
             
-            print(vehicle_state, vehicle, distance)
-
             # Check for tailgating: utile quando si parte da bordo strada e ci si deve intromettere
             if not vehicle_state and self._direction == RoadOption.LANEFOLLOW \
                     and not waypoint.is_junction and self._speed > 10 \
@@ -328,38 +326,29 @@ class BehaviorAgent(BasicAgent):
                 print("TOO CLOSE to pedestrian, distance = ", distance, "ID: ", walker.id)
                 return self.emergency_stop()
 
-        # 2.2: Static object avoidance behaviors
-        """ob_state, ob_detected, ob_distance = self.static_object_avoid_manager(ego_vehicle_wp)
-
-        if ob_state:
-            # Distance is computed from the center of the two cars,
-            # we use bounding boxes to calculate the actual distance
-            distance = ob_distance - max(
-                ob_detected.bounding_box.extent.y, ob_detected.bounding_box.extent.x) - max(
-                    self._vehicle.bounding_box.extent.y, self._vehicle.bounding_box.extent.x)
-
-            print("distance in run_step: ", distance, ob_distance)
-
-            # Emergency brake if the car is very close.
-            if distance < self._behavior.braking_distance:
-                print("TOO CLOSE to static object, distance = ", distance, "ID: ", ob_detected.id)
-                return self.emergency_stop()
-            else:
-                control = self.car_following_manager(ob_detected, distance)"""
-
-
-        # 2.3: Car following behaviors
+        # 2.2: Car following behaviors and static object avoidance behaviors
         vehicle_state, vehicle, distance = self.collision_and_car_avoid_manager(ego_vehicle_wp)
 
+        
         if vehicle_state:
+            print(vehicle.type_id, distance)
             # Distance is computed from the center of the two cars,
             # we use bounding boxes to calculate the actual distance
             distance = distance - max(
                 vehicle.bounding_box.extent.y, vehicle.bounding_box.extent.x) - max(
                     self._vehicle.bounding_box.extent.y, self._vehicle.bounding_box.extent.x)
 
-            # Emergency brake if the car is very close.
-            if distance < self._behavior.braking_distance:
+            # static object management
+            if "vehicle" not in vehicle.type_id:
+                # sorpasso
+                if distance < self._behavior.overtake_distance:
+                    print("START LANE CHANGE")
+                    self.lane_change('left', 3, 4)
+                control = self.car_following_manager(vehicle, distance)
+            
+            # vehicle management
+            elif distance < self._behavior.braking_distance:
+                # Emergency brake if the car is very close.
                 print("TOO CLOSE to vechicle, distance = ", distance, "ID: ", vehicle.id)
                 return self.emergency_stop()
             else:

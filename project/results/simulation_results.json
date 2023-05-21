@@ -1,0 +1,48 @@
+{
+    "_checkpoint": {
+        "global_record": {},
+        "progress": [
+            1,
+            5
+        ],
+        "records": [
+            {
+                "index": 0,
+                "route_id": "RouteScenario_1_rep0",
+                "status": "Failed - Agent crashed",
+                "num_infractions": 0,
+                "infractions": {
+                    "collisions_layout": [],
+                    "collisions_pedestrian": [],
+                    "collisions_vehicle": [],
+                    "red_light": [],
+                    "stop_infraction": [],
+                    "outside_route_lanes": [],
+                    "min_speed_infractions": [],
+                    "yield_emergency_vehicles_infractions": [],
+                    "scenario_timeouts": [],
+                    "route_dev": [],
+                    "vehicle_blocked": [],
+                    "route_timeout": []
+                },
+                "scores": {
+                    "score_route": 3.06,
+                    "score_penalty": 1.0,
+                    "score_composed": 3.06
+                },
+                "meta": {
+                    "route_length": 3206.913,
+                    "duration_game": 11.25,
+                    "duration_system": 48.288
+                }
+            }
+        ]
+    },
+    "entry_status": "Started",
+    "eligible": false,
+    "sensors": [
+        "carla_speedometer"
+    ],
+    "values": [],
+    "labels": []
+}
