@@ -25,6 +25,7 @@ class Normal(object):
     braking_distance = 5
     tailgate_counter = 0
     overtake_distance = 10
+    safety_space_reentry = 3
 
 
 class Aggressive(object):
