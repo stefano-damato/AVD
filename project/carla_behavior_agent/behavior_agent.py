@@ -49,7 +49,7 @@ class BehaviorAgent(BasicAgent):
         self._incoming_waypoint = None
         self._min_speed = 5
         self._behavior = None
-        self._sampling_resolution = 4.5
+        self._sampling_resolution = 2
 
         # Parameters for agent behavior
         if behavior == 'cautious':
@@ -79,6 +79,8 @@ class BehaviorAgent(BasicAgent):
             steps=self._look_ahead_steps)
         if self._incoming_direction is None:
             self._incoming_direction = RoadOption.LANEFOLLOW
+
+        self._overake_coverage-=1
         
         """self._behavior.braking_distance = (self._speed/10)**2
         print("Current velocity: ",self._speed,", Security distance: ", self._behavior.braking_distance)"""
@@ -210,7 +212,7 @@ class BehaviorAgent(BasicAgent):
                 print("tailgating from collision and car avoidance manager")
                 self._tailgating(waypoint, ob_list)
 
-        return vehicle_state, vehicle, distance
+        return vehicle_state, vehicle, distance, ob_list
 
     def pedestrian_avoid_manager(self, waypoint):
         """
@@ -288,6 +290,10 @@ class BehaviorAgent(BasicAgent):
 
         return control
 
+    def overtake_manager(self):
+        
+
+
     def run_step(self, debug=False):
         """
         Execute one step of navigation.
@@ -303,6 +309,8 @@ class BehaviorAgent(BasicAgent):
 
         ego_vehicle_loc = self._vehicle.get_location()
         ego_vehicle_wp = self._map.get_waypoint(ego_vehicle_loc)
+
+        print(list(self._local_planner._waypoints_queue)[:20], "length: ", len(self._local_planner._waypoints_queue))
 
         # 1: Red lights and stops behavior
         if self.traffic_light_manager():
@@ -329,7 +337,6 @@ class BehaviorAgent(BasicAgent):
         # 2.2: Car following behaviors and static object avoidance behaviors
         vehicle_state, vehicle, distance = self.collision_and_car_avoid_manager(ego_vehicle_wp)
 
-        
         if vehicle_state:
             print(vehicle.type_id, distance)
             # Distance is computed from the center of the two cars,
@@ -339,15 +346,20 @@ class BehaviorAgent(BasicAgent):
                     self._vehicle.bounding_box.extent.y, self._vehicle.bounding_box.extent.x)
 
             # static object management
-            if "vehicle" not in vehicle.type_id:
-                # sorpasso
-                if distance < self._behavior.overtake_distance:
-                    print("START LANE CHANGE")
-                    self.lane_change('left', 3, 4)
-                control = self.car_following_manager(vehicle, distance)
-            
+            if "vehicle" not in vehicle.type_id and distance < self._behavior.overtake_distance and self._overake_coverage <= 0:
+                # overtake
+                print("START LANE CHANGE")
+                #overtake_possibile, other_lane_time = overtake_manager()
+                #if overtake_possibile:
+                self.lane_change('left', 0, 20, 1)
+                target_speed = min([
+                    self._behavior.max_speed,
+                    self._speed_limit - 5])
+                self._local_planner.set_speed(target_speed)
+                control = self._local_planner.run_step(debug=debug)
+        
             # vehicle management
-            elif distance < self._behavior.braking_distance:
+            if distance < self._behavior.braking_distance:
                 # Emergency brake if the car is very close.
                 print("TOO CLOSE to vechicle, distance = ", distance, "ID: ", vehicle.id)
                 return self.emergency_stop()

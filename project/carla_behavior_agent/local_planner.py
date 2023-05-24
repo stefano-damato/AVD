@@ -217,6 +217,38 @@ class LocalPlanner(object):
 
         self._stop_waypoint_creation = stop_waypoint_creation
         self._vehicle_controller.setWaypoints(self._waypoints_queue)
+    
+    def change_global_plan(self, current_plan, stop_waypoint_creation=True, clean_queue=False):
+        """
+        Adds a new plan to the local planner. A plan must be a list of [carla.Waypoint, RoadOption] pairs
+        The 'clean_queue` parameter erases the previous plan if True, otherwise, it adds it to the old one
+        The 'stop_waypoint_creation' flag stops the automatic creation of random waypoints
+
+        :param current_plan: list of (carla.Waypoint, RoadOption)
+        :param stop_waypoint_creation: bool
+        :param clean_queue: bool
+        :return:
+        """
+        if clean_queue:
+            self._waypoints_queue.clear()
+
+        # Remake the waypoints queue if the new plan has a higher length than the queue
+        new_plan_length = len(current_plan) + len(self._waypoints_queue)
+        if new_plan_length > self._waypoints_queue.maxlen:
+            new_waypoint_queue = deque(maxlen=new_plan_length)
+            for wp in self._waypoints_queue:
+                new_waypoint_queue.append(wp)
+            self._waypoints_queue = new_waypoint_queue
+            
+        for i in range(len(current_plan)):
+            self._waypoints_queue.popleft()
+
+        current_plan.reverse()
+        for elem in current_plan:
+            self._waypoints_queue.appendleft(elem)
+
+        self._stop_waypoint_creation = stop_waypoint_creation
+        self._vehicle_controller.setWaypoints(self._waypoints_queue)
 
     def run_step(self, debug=False):
         """

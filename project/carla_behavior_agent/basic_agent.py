@@ -16,7 +16,7 @@ from local_planner import LocalPlanner, RoadOption
 from global_route_planner import GlobalRoutePlanner
 from misc import (get_speed, is_within_distance,
                                get_trafficlight_trigger_location,
-                               compute_distance)
+                               compute_distance,draw_waypoints)
 # from perception.perfectTracker.gt_tracker import PerfectTracker
 
 class BasicAgent(object):
@@ -62,6 +62,7 @@ class BasicAgent(object):
         self._speed_ratio = 1
         self._max_brake = 0.5
         self._offset = 0
+        self._overake_coverage = 0
 
         # Change parameters according to the dictionary
         if 'target_speed' in opt_dict:
@@ -175,6 +176,19 @@ class BasicAgent(object):
             clean_queue=clean_queue
         )
 
+    def change_global_plan(self, plan, stop_waypoint_creation=True, clean_queue=False):
+        """
+        Adds a specific plan to the agent.
+
+            :param plan: list of [carla.Waypoint, RoadOption] representing the route to be followed
+            :param stop_waypoint_creation: stops the automatic random creation of waypoints
+            :param clean_queue: resets the current agent's plan
+        """
+        self._local_planner.change_global_plan(
+            plan,
+            stop_waypoint_creation=stop_waypoint_creation,
+            clean_queue=clean_queue
+        )
     def trace_route(self, start_waypoint, end_waypoint):
         """
         Calculates the shortest route between a starting and ending waypoint.
@@ -249,15 +263,98 @@ class BasicAgent(object):
             same_lane_time * speed,
             other_lane_time * speed,
             lane_change_time * speed,
-            True,
+            False,
             1,
             self._sampling_resolution
         )
+
+        self._overake_coverage = len(path)
         if path:
             print("path found for the lane change")
-            self.set_global_plan(path)
+            self.change_global_plan(path)
+            #draw_waypoints(self._vehicle.get_world(), path)
         else:
             print("WARNING: Ignoring the lane change as no path was found")
+
+    def _generate_lane_change_path(self, waypoint, direction='left', distance_same_lane=10,
+                                distance_other_lane=25, lane_change_distance=25,
+                                check=True, lane_changes=1, step_distance=2):
+        """
+        This methods generates a path that results in a lane change.
+        Use the different distances to fine-tune the maneuver.
+        If the lane change is impossible, the returned path will be empty.
+        """
+        distance_same_lane = max(distance_same_lane, 0.1)
+        distance_other_lane = max(distance_other_lane, 0.1)
+        lane_change_distance = max(lane_change_distance, 0.1)
+
+        plan = []
+        plan.append((waypoint, RoadOption.LANEFOLLOW))  # start position
+
+        option = RoadOption.LANEFOLLOW
+
+        # Same lane
+        distance = 0
+        while distance < distance_same_lane:
+            next_wps = plan[-1][0].next(step_distance)      # take the waypoint at step_distance distance 
+            if not next_wps:
+                return []
+            next_wp = next_wps[0]
+            distance += next_wp.transform.location.distance(plan[-1][0].transform.location)
+            plan.append((next_wp, RoadOption.LANEFOLLOW))
+
+        if direction == 'left':
+            option = RoadOption.CHANGELANELEFT
+        elif direction == 'right':
+            option = RoadOption.CHANGELANERIGHT
+        else:
+            print("ERROR, input value for change must be 'left' or 'right'")
+            return []
+
+        lane_changes_done = 0
+        lane_change_distance = lane_change_distance / lane_changes
+
+        # Lane change
+        while lane_changes_done < lane_changes:
+
+            # Move forward
+            next_wps = plan[-1][0].next(lane_change_distance)
+            if not next_wps:
+                return []
+            next_wp = next_wps[0]
+
+            # Get the side lane
+            if direction == 'left':
+                if check and str(next_wp.lane_change) not in ['Left', 'Both']:
+                    print("Check: ", str(next_wp.lane_change),next_wp.get_left_lane())
+                    return []
+                side_wp = next_wp.get_left_lane()
+            else:
+                if check and str(next_wp.lane_change) not in ['Right', 'Both']:
+                    return []
+                side_wp = next_wp.get_right_lane()
+
+            if not side_wp or side_wp.lane_type != carla.LaneType.Driving:
+                return []
+
+            # Update the plan
+            plan.append((side_wp, option))
+            lane_changes_done += 1
+
+        # Other lane
+        distance = 0
+        while distance < distance_other_lane:
+            next_wps = plan[-1][0].previous(step_distance)
+            if not next_wps:
+                return []
+            next_wp = next_wps[0]
+            distance += next_wp.transform.location.distance(plan[-1][0].transform.location)
+            plan.append((next_wp, RoadOption.LANEFOLLOW))
+
+        for e in plan:
+            print(e)
+        
+        return plan 
 
     def _affected_by_traffic_light(self, lights_list=None, max_distance=None):
         """
@@ -458,7 +555,6 @@ class BasicAgent(object):
             x=ego_extent * ego_forward_vector.x,
             y=ego_extent * ego_forward_vector.y,
         )
-        print("INSIDE _vehicle_obstacle_detected")
         for target_vehicle in vehicle_list:
             target_transform = target_vehicle.get_transform() #dove si trova il veicolo
             target_wpt = self._map.get_waypoint(target_transform.location, lane_type=carla.LaneType.Any) #acquisisci la posizione in forma di waypoint perchè dà informazioni anche sulla corsia
@@ -536,78 +632,4 @@ class BasicAgent(object):
 
         return (False, None, -1)
 
-    def _generate_lane_change_path(self, waypoint, direction='left', distance_same_lane=10,
-                                distance_other_lane=25, lane_change_distance=25,
-                                check=True, lane_changes=1, step_distance=2):
-        """
-        This methods generates a path that results in a lane change.
-        Use the different distances to fine-tune the maneuver.
-        If the lane change is impossible, the returned path will be empty.
-        """
-        distance_same_lane = max(distance_same_lane, 0.1)
-        distance_other_lane = max(distance_other_lane, 0.1)
-        lane_change_distance = max(lane_change_distance, 0.1)
-
-        plan = []
-        plan.append((waypoint, RoadOption.LANEFOLLOW))  # start position
-
-        option = RoadOption.LANEFOLLOW
-
-        # Same lane
-        distance = 0
-        while distance < distance_same_lane:
-            next_wps = plan[-1][0].next(step_distance)
-            if not next_wps:
-                return []
-            next_wp = next_wps[0]
-            distance += next_wp.transform.location.distance(plan[-1][0].transform.location)
-            plan.append((next_wp, RoadOption.LANEFOLLOW))
-
-        if direction == 'left':
-            option = RoadOption.CHANGELANELEFT
-        elif direction == 'right':
-            option = RoadOption.CHANGELANERIGHT
-        else:
-            # ERROR, input value for change must be 'left' or 'right'
-            return []
-
-        lane_changes_done = 0
-        lane_change_distance = lane_change_distance / lane_changes
-
-        # Lane change
-        while lane_changes_done < lane_changes:
-
-            # Move forward
-            next_wps = plan[-1][0].next(lane_change_distance)
-            if not next_wps:
-                return []
-            next_wp = next_wps[0]
-
-            # Get the side lane
-            if direction == 'left':
-                if check and str(next_wp.lane_change) not in ['Left', 'Both']:
-                    return []
-                side_wp = next_wp.get_left_lane()
-            else:
-                if check and str(next_wp.lane_change) not in ['Right', 'Both']:
-                    return []
-                side_wp = next_wp.get_right_lane()
-
-            if not side_wp or side_wp.lane_type != carla.LaneType.Driving:
-                return []
-
-            # Update the plan
-            plan.append((side_wp, option))
-            lane_changes_done += 1
-
-        # Other lane
-        distance = 0
-        while distance < distance_other_lane:
-            next_wps = plan[-1][0].next(step_distance)
-            if not next_wps:
-                return []
-            next_wp = next_wps[0]
-            distance += next_wp.transform.location.distance(plan[-1][0].transform.location)
-            plan.append((next_wp, RoadOption.LANEFOLLOW))
-
-        return plan
+    
