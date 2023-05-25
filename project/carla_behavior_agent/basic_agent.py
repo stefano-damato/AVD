@@ -351,6 +351,36 @@ class BasicAgent(object):
             distance += next_wp.transform.location.distance(plan[-1][0].transform.location)
             plan.append((next_wp, RoadOption.LANEFOLLOW))
 
+        """
+        lane_changes_done = 0
+        lane_change_distance = lane_change_distance / lane_changes
+        # Lane change for reentry
+        while lane_changes_done < lane_changes:
+
+            # Move forward
+            next_wps = plan[-1][0].next(lane_change_distance)
+            if not next_wps:
+                return []
+            next_wp = next_wps[0]
+
+            # Get the side lane
+            if direction == 'left':
+                if check and str(next_wp.lane_change) not in ['Right', 'Both']:
+                    return []
+                side_wp = next_wp.get_right_lane()
+            else:
+                if check and str(next_wp.lane_change) not in ['Left', 'Both']:
+                    print("Check: ", str(next_wp.lane_change),next_wp.get_left_lane())
+                    return []
+                side_wp = next_wp.get_left_lane()
+
+            if not side_wp or side_wp.lane_type != carla.LaneType.Driving:
+                return []
+
+            # Update the plan
+            plan.append((side_wp, option))
+            lane_changes_done += 1"""
+        
         for e in plan:
             print(e)
         

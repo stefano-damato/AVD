@@ -319,8 +319,97 @@ class BehaviorAgent(BasicAgent):
             print("target_vehicle_time: ", target_vehicle_time)
             print("other_line_time: ", other_line_time)
             if target_vehicle_time > other_line_time:
-                return True, other_line_time
+                return True, other_line_distance
 
+        return False, 0
+    def overtake_manager_ver2(self, lane_offset = 1 ):
+
+        ego_wpt = self._map.get_waypoint(self._vehicle.get_location())
+        
+        vehicle_list = self._world.get_actors().filter("*vehicle*")
+        static_ob_list = self._world.get_actors().filter("*static*")
+
+        horizon = 100
+
+        # list of object to overtake
+        ob_list = [v for v in static_ob_list if is_within_distance(v.get_transform(), self._vehicle.get_transform(), horizon, [0,60])     # se l'ggetto è avanti a noi ad una distanza massima
+                                                and v.id != self._vehicle.id
+                                                and ego_wpt.lane_id == self._map.get_waypoint(v.get_transform().location, lane_type=carla.LaneType.Any).lane_id]      # se l'oggetto è nella nostra stessa corsia
+        
+        def dist(v): return v.get_location().distance(self._vehicle.get_transform().location)
+        ob_list.sort(key=lambda x:dist(x))
+
+        # search for the first location in which perform the reentry
+        search_for_reentry = True
+        safety_distance_for_reentry = self._vehicle.bounding_box.extent.x*2 + self._behavior.safety_space_reentry
+        i = 0
+        while search_for_reentry:
+            if i == len(ob_list)-1:
+                break
+            ob1_length = ob_list[i].bounding_box.extent.x
+            ob2_length = ob_list[i+1].bounding_box.extent.x
+            distance_between_objects = ob_list[i].get_location().distance(ob_list[i+1].get_location()) - (ob1_length+ob2_length) 
+            if distance_between_objects > safety_distance_for_reentry:
+                break
+            i+=1
+            
+        other_line_distance = ob_list[i].get_location().distance(self._vehicle.get_location()) + ob_list[i].bounding_box.extent.x + self._behavior.safety_space_reentry/2
+        
+        print("distance from the last obstacle: ", dist(ob_list[-1]))
+        
+        print("Distance for overtake: ", other_line_distance)
+
+        target_line_id =  ego_wpt.lane_id + lane_offset
+        target_line_id = target_line_id if target_line_id != 0 else target_line_id + 1      # 0 is the central lane
+
+        # list of vehicle on the lane in wihch we have to move
+        ob_list = [v for v in vehicle_list if is_within_distance(v.get_transform(), self._vehicle.get_transform(), horizon, [0,90])     # se l'ggetto è avanti a noi ad una distanza massima
+                                                and v.id != self._vehicle.id
+                                                and target_line_id == self._map.get_waypoint(v.get_transform().location, lane_type=carla.LaneType.Any).lane_id]      # se l'oggetto è nella corsia desiderata
+
+        if len(ob_list) == 0:
+            return True, other_line_time
+        
+        ob_list.sort(key=lambda x:dist(x))
+        target_vehicle = ob_list[0]
+        target_vehicle_distance = dist(target_vehicle)
+
+        if target_vehicle_distance > other_line_distance:
+            target_vehicle_velocity = get_speed(target_vehicle)
+            target_vehicle_time = (target_vehicle_distance-other_line_distance)/target_vehicle_velocity
+            """
+            a = 0.1
+            a_max = 1
+            v0 = self._vehicle.get_velocity()
+            s = other_line_distance
+            other_line_time = target_vehicle_time + 1
+            while a <= a_max and other_line_time >= target_vehicle_time:
+                delta = (-2*v0/a)**2 + 8*s/a #delta non può essere <= 0
+                t1,t2 = (-(2*v0/a) + delta**0.5)/2, (-(2*v0/a) - delta**0.5)/2
+                other_line_time = max(t1,t2)
+                vf = v0 + a*other_line_time
+                a+=0.1
+                if vf > self.max_speed:
+                    other_line_time = target_vehicle_time"""
+            
+            
+            a = 0.1 ### dobbiamo stimare l'acelerazione
+            v0 = self._vehicle.get_velocity()
+            v_max = self._behavior.max_speed
+            t_acc = (v_max-v0)/a
+            s_acc = v0*t_acc + 0.5*a*(t_acc**2)
+            if s_acc >= other_line_distance:
+                print("controlla il tempo")
+                delta = (-2*v0/a)**2 + 8*other_line_distance/a #delta non può essere <= 0
+                t1,t2 = (-(2*v0/a) + delta**0.5)/2, (-(2*v0/a) - delta**0.5)/2
+                other_line_time = max(t1,t2)
+                if target_vehicle_time > other_line_time:
+                    return True, other_line_time
+            elif t_acc < target_vehicle_time:
+                t_const =(other_line_distance-s_acc)/v_max
+                other_line_time = t_acc+t_const
+                if target_vehicle_time > other_line_time:
+                    return True, other_line_time
         return False, 0
         
 
@@ -429,3 +518,6 @@ class BehaviorAgent(BasicAgent):
         control.brake = self._max_brake
         control.hand_brake = False
         return control
+
+
+
