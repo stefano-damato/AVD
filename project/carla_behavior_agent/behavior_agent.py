@@ -284,15 +284,18 @@ class BehaviorAgent(BasicAgent):
             if i == len(ob_list)-1:
                 break
             ob1_length = ob_list[i].bounding_box.extent.x
+            print(ob_list[i].type_id, " ob1 length: ", ob1_length, "distance: ", compute_distance(ob_list[i].get_transform().location, self._vehicle.get_transform().location))
             ob2_length = ob_list[i+1].bounding_box.extent.x
-            distance_between_objects = ob_list[i].get_location().distance(ob_list[i+1].get_location()) - (ob1_length+ob2_length) 
+            print(ob_list[i+1].type_id, " ob2 length: ", ob2_length, "distance: ", compute_distance(ob_list[i+1].get_transform().location, self._vehicle.get_transform().location))
+            distance_between_objects =compute_distance(ob_list[i].get_transform().location, ob_list[i+1].get_transform().location) - (ob1_length+ob2_length) 
+            print("distance between objects: ", distance_between_objects)
             if distance_between_objects > safety_distance_for_reentry:
                 break
             i+=1
             
-        other_line_distance = ob_list[i].get_location().distance(self._vehicle.get_location()) + ob_list[i].bounding_box.extent.x + self._behavior.safety_space_reentry/2
+        other_line_distance = compute_distance(ob_list[i].get_transform().location, self._vehicle.get_transform().location) + ob_list[i].bounding_box.extent.x + self._behavior.safety_space_reentry/2
         
-        print("distance from the last obstacle: ", dist(ob_list[-1]))
+        print("distance from the last obstacle: ", compute_distance(ob_list[i].get_transform().location, self._vehicle.get_transform().location))
         
         print("Distance for overtake: ", other_line_distance)
 
@@ -309,7 +312,7 @@ class BehaviorAgent(BasicAgent):
         other_line_time = other_line_distance/(self._behavior.max_speed/2)  #time spent on the other line is estimed to be calculated on target velocity/2
         
         if len(ob_list) == 0:
-            return True, other_line_time
+            return True, other_line_distance
         target_vehicle = ob_list[0]
         target_vehicle_distance = dist(target_vehicle)
 
@@ -322,6 +325,7 @@ class BehaviorAgent(BasicAgent):
                 return True, other_line_distance
 
         return False, 0
+
     def overtake_manager_ver2(self, lane_offset = 1 ):
 
         ego_wpt = self._map.get_waypoint(self._vehicle.get_location())
@@ -430,8 +434,6 @@ class BehaviorAgent(BasicAgent):
         ego_vehicle_loc = self._vehicle.get_location()
         ego_vehicle_wp = self._map.get_waypoint(ego_vehicle_loc)
 
-        print(list(self._local_planner._waypoints_queue)[:20], "length: ", len(self._local_planner._waypoints_queue))
-
         # 1: Red lights and stops behavior
         if self.traffic_light_manager():
             print("RED LIGHTS")
@@ -469,9 +471,9 @@ class BehaviorAgent(BasicAgent):
             if "vehicle" not in vehicle.type_id and distance < self._behavior.overtake_distance and self._overake_coverage <= 0:
                 # overtake
                 print("START LANE CHANGE")
-                overtake_possibile, other_lane_time = self.overtake_manager()
+                overtake_possibile, other_line_distance = self.overtake_manager()
                 if overtake_possibile:
-                    self.lane_change('left', 0, other_lane_time, 1)
+                    self.lane_change('left', 0, other_line_distance-7, 1)
                     target_speed = min([
                         self._behavior.max_speed,
                         self._speed_limit - 5])

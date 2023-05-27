@@ -250,7 +250,7 @@ class BasicAgent(object):
         """(De)activates the checks for stop signs"""
         self._ignore_vehicles = active
 
-    def lane_change(self, direction, same_lane_time=0, other_lane_time=0, lane_change_time=2):
+    def lane_change(self, direction, same_lane_time=0, other_line_distance=0, lane_change_time=2):
         """
         Changes the path so that the vehicle performs a lane change.
         Use 'direction' to specify either a 'left' or 'right' lane change,
@@ -261,7 +261,7 @@ class BasicAgent(object):
             self._map.get_waypoint(self._vehicle.get_location()),
             direction,
             same_lane_time * speed,
-            other_lane_time * speed,
+            other_line_distance,
             lane_change_time * speed,
             False,
             1,
@@ -270,7 +270,7 @@ class BasicAgent(object):
 
         self._overake_coverage = len(path)
         if path:
-            print("path found for the lane change")
+            print("path found for the lane change, length: ", path[0][0].transform.location.distance(path[-1][0].transform.location))
             self.change_global_plan(path)
             #draw_waypoints(self._vehicle.get_world(), path)
         else:
@@ -301,6 +301,7 @@ class BasicAgent(object):
                 return []
             next_wp = next_wps[0]
             distance += next_wp.transform.location.distance(plan[-1][0].transform.location)
+            print("DISATNCE same lane: ", distance)
             plan.append((next_wp, RoadOption.LANEFOLLOW))
 
         if direction == 'left':
@@ -349,6 +350,7 @@ class BasicAgent(object):
                 return []
             next_wp = next_wps[0]
             distance += next_wp.transform.location.distance(plan[-1][0].transform.location)
+            print("DISATNCE other lane: ", distance)
             plan.append((next_wp, RoadOption.LANEFOLLOW))
 
         """
@@ -380,9 +382,6 @@ class BasicAgent(object):
             # Update the plan
             plan.append((side_wp, option))
             lane_changes_done += 1"""
-        
-        for e in plan:
-            print(e)
         
         return plan 
 
