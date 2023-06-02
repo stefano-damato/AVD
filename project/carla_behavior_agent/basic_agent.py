@@ -56,13 +56,15 @@ class BasicAgent(object):
         self._ignore_vehicles = False
         self._use_bbs_detection = False
         self._target_speed = 5.0
-        self._sampling_resolution = 2.0
+        self._sampling_resolution = 2
         self._base_tlight_threshold = 5.0  # meters
         self._base_vehicle_threshold = 5.0  # meters
         self._speed_ratio = 1
         self._max_brake = 0.5
         self._offset = 0
         self._overake_coverage = 0
+        self._len_waypoints_queue_before_overatke = None
+        self._old_wpt = None
 
         # Change parameters according to the dictionary
         if 'target_speed' in opt_dict:
@@ -250,7 +252,7 @@ class BasicAgent(object):
         """(De)activates the checks for stop signs"""
         self._ignore_vehicles = active
 
-    def lane_change(self, direction, same_lane_time=0, other_line_distance=0, lane_change_time=2):
+    def lane_change(self, direction, same_lane_time=0, other_line_distance=0, lane_change_distance=2):
         """
         Changes the path so that the vehicle performs a lane change.
         Use 'direction' to specify either a 'left' or 'right' lane change,
@@ -260,18 +262,23 @@ class BasicAgent(object):
         path = self._generate_lane_change_path(
             self._map.get_waypoint(self._vehicle.get_location()),
             direction,
-            same_lane_time * speed,
+            same_lane_time*speed,
             other_line_distance,
-            lane_change_time * speed,
+            lane_change_distance,
             False,
             1,
             self._sampling_resolution
         )
 
-        self._overake_coverage = len(path)
         if path:
             print("path found for the lane change, length: ", path[0][0].transform.location.distance(path[-1][0].transform.location))
+            print("appended waypoints: ", len(path))
+            print("Distance between waypoints: ")
+            for i in range(1, len(path)):
+                print(path[i-1][0].transform.location.distance(path[i][0].transform.location))
             self.change_global_plan(path)
+            self._overake_coverage = len(path) + 3
+            self._len_waypoints_queue_before_overatke = len(self._local_planner._waypoints_queue)
             #draw_waypoints(self._vehicle.get_world(), path)
         else:
             print("WARNING: Ignoring the lane change as no path was found")
@@ -353,35 +360,42 @@ class BasicAgent(object):
             print("DISATNCE other lane: ", distance)
             plan.append((next_wp, RoadOption.LANEFOLLOW))
 
-        """
+        
         lane_changes_done = 0
         lane_change_distance = lane_change_distance / lane_changes
         # Lane change for reentry
         while lane_changes_done < lane_changes:
 
             # Move forward
-            next_wps = plan[-1][0].next(lane_change_distance)
+            next_wps = plan[-1][0].previous(lane_change_distance)
             if not next_wps:
+                print("LINE 365")
                 return []
             next_wp = next_wps[0]
 
             # Get the side lane
             if direction == 'left':
-                if check and str(next_wp.lane_change) not in ['Right', 'Both']:
-                    return []
-                side_wp = next_wp.get_right_lane()
-            else:
                 if check and str(next_wp.lane_change) not in ['Left', 'Both']:
                     print("Check: ", str(next_wp.lane_change),next_wp.get_left_lane())
                     return []
                 side_wp = next_wp.get_left_lane()
+            else:
+                if check and str(next_wp.lane_change) not in ['Right', 'Both']:
+                    return []
+                side_wp = next_wp.get_right_lane()
 
             if not side_wp or side_wp.lane_type != carla.LaneType.Driving:
+                if not side_wp:
+                    print("LINE 382")
+                print(str(next_wp.lane_change))
+                print(next_wp.get_left_lane().lane_type)
+                print(next_wp.get_right_lane().lane_type)
+                print("LINE 383")
                 return []
 
             # Update the plan
             plan.append((side_wp, option))
-            lane_changes_done += 1"""
+            lane_changes_done += 1
         
         return plan 
 

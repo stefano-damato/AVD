@@ -88,6 +88,8 @@ class LocalPlanner(object):
         self._distance_ratio = 0.5
         self._follow_speed_limits = False
 
+        self.first = True
+
         # Overload parameters
         if opt_dict:
             if 'dt' in opt_dict:
@@ -240,12 +242,21 @@ class LocalPlanner(object):
                 new_waypoint_queue.append(wp)
             self._waypoints_queue = new_waypoint_queue
             
-        for i in range(len(current_plan)):
+        if len(current_plan)==1:
             self._waypoints_queue.popleft()
-
-        current_plan.reverse()
-        for elem in current_plan:
             self._waypoints_queue.appendleft(elem)
+        else:
+            first = self._waypoints_queue.popleft()
+            dist = current_plan[0][0].transform.location.distance(current_plan[-1][0].transform.location)
+            old_dist = 0
+            #for i in range(len(current_plan)):
+            while dist-old_dist > 0:
+                wpt = self._waypoints_queue.popleft()
+                old_dist = first[0].transform.location.distance(wpt[0].transform.location)
+
+            current_plan.reverse()
+            for elem in current_plan:
+                self._waypoints_queue.appendleft(elem)
 
         self._stop_waypoint_creation = stop_waypoint_creation
         self._vehicle_controller.setWaypoints(self._waypoints_queue)

@@ -80,8 +80,15 @@ class BehaviorAgent(BasicAgent):
         if self._incoming_direction is None:
             self._incoming_direction = RoadOption.LANEFOLLOW
 
-        self._overake_coverage-=1
-        
+        print("overtake coverage: ", self._overake_coverage)
+        """if self._map.get_waypoint(self._vehicle.get_location()).id != self._old_wpt:
+            self._old_wpt = self._map.get_waypoint(self._vehicle.get_location()).id
+            self._overake_coverage = 0"""
+
+        if self._len_waypoints_queue_before_overatke is not None and (self._len_waypoints_queue_before_overatke - len(self._local_planner._waypoints_queue)) == self._overake_coverage:
+            self._len_waypoints_queue_before_overatke = None
+            self._overake_coverage = 0
+        #self._overake_coverage-=1
         """self._behavior.braking_distance = (self._speed/10)**2
         print("Current velocity: ",self._speed,", Security distance: ", self._behavior.braking_distance)"""
 
@@ -440,7 +447,6 @@ class BehaviorAgent(BasicAgent):
             return self.emergency_stop()
 
         
-        
         # 2.1: Pedestrian avoidance behaviors
         walker_state, walker, w_distance = self.pedestrian_avoid_manager(ego_vehicle_wp)
 
@@ -459,7 +465,8 @@ class BehaviorAgent(BasicAgent):
         # 2.2: Car following behaviors and static object avoidance behaviors
         vehicle_state, vehicle, distance, ob_list = self.collision_and_car_avoid_manager(ego_vehicle_wp)
 
-        if vehicle_state:
+        # entra solo se non stai sorpassando
+        if vehicle_state and self._overake_coverage==0:
             print(vehicle.type_id, distance)
             # Distance is computed from the center of the two cars,
             # we use bounding boxes to calculate the actual distance
@@ -468,19 +475,19 @@ class BehaviorAgent(BasicAgent):
                     self._vehicle.bounding_box.extent.y, self._vehicle.bounding_box.extent.x)
 
             # static object management
-            if "vehicle" not in vehicle.type_id and distance < self._behavior.overtake_distance and self._overake_coverage <= 0:
+            if "vehicle" not in vehicle.type_id and distance < self._behavior.overtake_distance:
                 # overtake
                 print("START LANE CHANGE")
                 overtake_possibile, other_line_distance = self.overtake_manager()
                 if overtake_possibile:
-                    self.lane_change('left', 0, other_line_distance-7, 1)
+                    self.lane_change('left', 0, other_line_distance-4, 2) #-4 perchè 2 metri vengono fatti sulla stessa corsia e due metri nei cambi corsia
                     target_speed = min([
                         self._behavior.max_speed,
                         self._speed_limit - 5])
                     self._local_planner.set_speed(target_speed)
-                    control = self._local_planner.run_step(debug=debug)             
+                    control = self._local_planner.run_step(debug=debug)  
         
-            # vehicle management
+                
             if distance < self._behavior.braking_distance:
                 # Emergency brake if the car is very close.
                 print("TOO CLOSE to vechicle, distance = ", distance, "ID: ", vehicle.id)
