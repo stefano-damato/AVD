@@ -63,6 +63,8 @@ class BasicAgent(object):
         self._max_brake = 0.5
         self._offset = 0
         self._overake_coverage = 0
+        self._overtake = False
+        self._overtake_velocity = 80
         self._len_waypoints_queue_before_overatke = None
         self._old_wpt = None
 
@@ -272,13 +274,11 @@ class BasicAgent(object):
 
         if path:
             print("path found for the lane change, length: ", path[0][0].transform.location.distance(path[-1][0].transform.location))
-            print("appended waypoints: ", len(path))
-            print("Distance between waypoints: ")
-            for i in range(1, len(path)):
-                print(path[i-1][0].transform.location.distance(path[i][0].transform.location))
             self.change_global_plan(path)
             self._overake_coverage = len(path) + 3
+            self._overtake = True
             self._len_waypoints_queue_before_overatke = len(self._local_planner._waypoints_queue)
+            self._behavior.max_speed = self._overtake_velocity
             #draw_waypoints(self._vehicle.get_world(), path)
         else:
             print("WARNING: Ignoring the lane change as no path was found")
@@ -301,14 +301,14 @@ class BasicAgent(object):
         option = RoadOption.LANEFOLLOW
 
         # Same lane
-        distance = 0
+        """distance = 0
         while distance < distance_same_lane:
             next_wps = plan[-1][0].next(step_distance)      # take the waypoint at step_distance distance 
             if not next_wps:
                 return []
             next_wp = next_wps[0]
             distance += next_wp.transform.location.distance(plan[-1][0].transform.location)
-            print("DISATNCE same lane: ", distance)
+            #print("DISATNCE same lane: ", distance)
             plan.append((next_wp, RoadOption.LANEFOLLOW))
 
         if direction == 'left':
@@ -317,7 +317,7 @@ class BasicAgent(object):
             option = RoadOption.CHANGELANERIGHT
         else:
             print("ERROR, input value for change must be 'left' or 'right'")
-            return []
+            return []"""
 
         lane_changes_done = 0
         lane_change_distance = lane_change_distance / lane_changes
@@ -357,19 +357,18 @@ class BasicAgent(object):
                 return []
             next_wp = next_wps[0]
             distance += next_wp.transform.location.distance(plan[-1][0].transform.location)
-            print("DISATNCE other lane: ", distance)
+            #print("DISATNCE other lane: ", distance)
             plan.append((next_wp, RoadOption.LANEFOLLOW))
 
         
         lane_changes_done = 0
-        lane_change_distance = lane_change_distance / lane_changes
+        lane_change_distance = (lane_change_distance) / lane_changes 
         # Lane change for reentry
         while lane_changes_done < lane_changes:
 
             # Move forward
             next_wps = plan[-1][0].previous(lane_change_distance)
             if not next_wps:
-                print("LINE 365")
                 return []
             next_wp = next_wps[0]
 
@@ -385,17 +384,19 @@ class BasicAgent(object):
                 side_wp = next_wp.get_right_lane()
 
             if not side_wp or side_wp.lane_type != carla.LaneType.Driving:
-                if not side_wp:
-                    print("LINE 382")
-                print(str(next_wp.lane_change))
-                print(next_wp.get_left_lane().lane_type)
-                print(next_wp.get_right_lane().lane_type)
-                print("LINE 383")
                 return []
 
             # Update the plan
             plan.append((side_wp, option))
             lane_changes_done += 1
+        
+        next_wps = plan[-1][0].next(step_distance)
+        if not next_wps:
+            return []
+        next_wp = next_wps[0]
+        distance += next_wp.transform.location.distance(plan[-1][0].transform.location)
+        #print("DISATNCE other lane: ", distance)
+        plan.append((next_wp, RoadOption.LANEFOLLOW))
         
         return plan 
 

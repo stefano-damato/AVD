@@ -53,7 +53,7 @@ class VehicleController():
         self._lat_controller = StanleyLateralController(self._vehicle, offset, **args_lateral)
 
 
-    def run_step(self, target_speed, waypoint):
+    def run_step(self, target_speed, waypoint, overtake=False):
         """
         Execute one step of control invoking both lateral and longitudinal
         PID controllers to reach a target waypoint
@@ -85,8 +85,11 @@ class VehicleController():
         self.past_steering = steering
 
         # smoothe curves
-        if abs(control.steer) > 0.1 and get_speed(self._vehicle) > 10:
-            target_speed = target_speed/2
+        if not overtake and abs(control.steer) > 0.1:
+            if get_speed(self._vehicle) > 40:
+                target_speed = target_speed/6
+            elif get_speed(self._vehicle) > 20:
+                target_speed = target_speed/2
 
         print("target speed controller: ", target_speed)
         

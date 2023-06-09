@@ -261,7 +261,7 @@ class LocalPlanner(object):
         self._stop_waypoint_creation = stop_waypoint_creation
         self._vehicle_controller.setWaypoints(self._waypoints_queue)
 
-    def run_step(self, debug=False):
+    def run_step(self, debug=False, overtake=False):
         """
         Execute one step of local planning which involves running the longitudinal and lateral PID controllers to
         follow the waypoints trajectory.
@@ -310,7 +310,7 @@ class LocalPlanner(object):
             self.target_waypoint, self.target_road_option = self._waypoints_queue[0]
             print("target speed local planner: ", self._target_speed)
 
-            control = self._vehicle_controller.run_step(self._target_speed, self.target_waypoint)
+            control = self._vehicle_controller.run_step(self._target_speed, self.target_waypoint, overtake=overtake)
 
         #if debug:
         #    draw_waypoints(self._vehicle.get_world(), [self.target_waypoint], 1.0)
