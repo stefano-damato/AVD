@@ -261,6 +261,14 @@ class LocalPlanner(object):
         self._stop_waypoint_creation = stop_waypoint_creation
         self._vehicle_controller.setWaypoints(self._waypoints_queue)
 
+    def set_lateral_offset(self, offset):
+        """Changes the offset of the lateral controller"""
+        self._vehicle_controller.set_lateral_offset(offset)
+
+    def change_lateral_controller(self, kv):
+        args_lateral = {"Kv":kv, "Ks":self._args_lateral_dict["K_S"],"dt":self._args_lateral_dict["dt"]}
+        self._vehicle_controller.change_lateral_controller(args_lateral)
+
     def run_step(self, debug=False, overtake=False):
         """
         Execute one step of local planning which involves running the longitudinal and lateral PID controllers to

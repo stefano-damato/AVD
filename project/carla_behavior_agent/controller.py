@@ -84,11 +84,11 @@ class VehicleController():
         control.manual_gear_shift = False
         self.past_steering = steering
 
-        # smoothe curves
+        # slow down in curves
         if not overtake and abs(control.steer) > 0.1:
             if get_speed(self._vehicle) > 40:
                 target_speed = target_speed/6
-            elif get_speed(self._vehicle) > 20:
+            elif get_speed(self._vehicle) > 21:
                 target_speed = target_speed/2
 
         print("target speed controller: ", target_speed)
@@ -116,6 +116,9 @@ class VehicleController():
     
     def setWaypoints(self, waypoints):
         self._lat_controller.setWaypoints(waypoints)
+
+    def set_lateral_offset(self, offset):
+        self._lat_controller.change_offset(offset)
 
 
 class PIDLongitudinalController():
@@ -258,7 +261,7 @@ class StanleyLateralController():
         # Get Target Waypoint
         ce_idx = self._get_lookahead_index(ego_loc,self._lookahead_distance)
         desired_x = self._wps[ce_idx][0].transform.location.x
-        desired_y = self._wps[ce_idx][0].transform.location.y
+        desired_y = self._wps[ce_idx][0].transform.location.y + self._offset
         
         # Get Target Heading
         if ce_idx < len(self._wps)-1:
@@ -305,6 +308,9 @@ class StanleyLateralController():
         self._kv = Kv
         self._ks = Ks
         self._dt = dt
+
+    def change_offset(self, offset):
+        self._offset = offset
     
     def setWaypoints(self, wps):
         """Sets trajectory to follow and filters spurious points"""
@@ -316,6 +322,10 @@ class StanleyLateralController():
             dd = hypot(trj_heading_x, trj_heading_y)
             if dd > 0:
                 self._wps.append(wps[i])
+
+    def set_lateral_offset(self, offset):
+        """Changes the offset"""
+        self._offset = offset
         
 class PIDLateralController():
     """

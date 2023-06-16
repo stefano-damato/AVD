@@ -67,7 +67,9 @@ class BasicAgent(object):
         self._overtake_velocity = 80
         self._len_waypoints_queue_before_overatke = None
         self._old_wpt = None
-
+        self._black_list = ["vehicle.nissan.patrol_2021", "static.prop.dirtdebris01", "a"]      # la black list è formata da attori che non bisogna sorpassare:
+                                                                                                # o oggetti statici sulla nostra corsia o veicoli a bordo strada (la cui
+                                                                                                # lane id è uguale a quella di veicoli a metà corsia che invece bisogna sorpassare)  
         # Change parameters according to the dictionary
         if 'target_speed' in opt_dict:
             self._target_speed = opt_dict['target_speed']
@@ -600,18 +602,27 @@ class BasicAgent(object):
             y=ego_extent * ego_forward_vector.y,
         )
         for target_vehicle in vehicle_list:
+
             target_transform = target_vehicle.get_transform() #dove si trova il veicolo
             target_wpt = self._map.get_waypoint(target_transform.location, lane_type=carla.LaneType.Any) #acquisisci la posizione in forma di waypoint perchè dà informazioni anche sulla corsia
 
             # Simplified version for outside junctions (se non si è negli incroci)
             if not ego_wpt.is_junction or not target_wpt.is_junction:
-
-                if target_wpt.road_id != ego_wpt.road_id or target_wpt.lane_id != ego_wpt.lane_id  + lane_offset: #se non è sulla stessa strada o corsia
+                if (target_wpt.road_id != ego_wpt.road_id or
+                        (target_vehicle.type_id in self._black_list and ("static" in target_vehicle.type_id or target_wpt.lane_id != ego_wpt.lane_id  + lane_offset) ) or       #della black list fanno parte o oggetti statici sulla mia corsia o veicoli su un'altra corsia
+                        (target_wpt.lane_id != ego_wpt.lane_id  + lane_offset and                               #se non è sulla stessa strada o corsia
+                        (target_wpt.lane_id != ego_wpt.lane_id + 1 or get_speed(target_vehicle)!=0 or "vehicle" not in target_vehicle.type_id))):         #se non è un veicolo parcheggiato
+                    next_wpt = self._local_planner.get_incoming_waypoint_and_direction(steps=3)[0]
                     next_wpt = self._local_planner.get_incoming_waypoint_and_direction(steps=3)[0]  # si può applicare un controllo migliore sulla frenata
-                    if not next_wpt:
+                    # if target_vehicle.type_id in self._black_list or not next_wpt or target_wpt.road_id != next_wpt.road_id or target_wpt.lane_id != next_wpt.lane_id  + lane_offset:#se dove voglio andare (terzo step) non è nella posizione del veicolo analizzato
+
+                    if (not next_wpt or
+                        target_wpt.road_id != next_wpt.road_id or
+                        (target_vehicle.type_id in self._black_list and ("static" in target_vehicle.type_id or target_wpt.lane_id != next_wpt.lane_id  + lane_offset) ) or       #della black list fanno parte o oggetti statici sulla mia corsia o veicoli su un'altra corsia
+                        (target_wpt.lane_id != next_wpt.lane_id  + lane_offset and                               #se non è sulla stessa strada o corsia
+                        (target_wpt.lane_id != next_wpt.lane_id + 1 or get_speed(target_vehicle)!=0 or "vehicle" not in target_vehicle.type_id))):         #se non è un veicolo parcheggiato
                         continue
-                    if target_wpt.road_id != next_wpt.road_id or target_wpt.lane_id != next_wpt.lane_id  + lane_offset: #se dove voglio andare (terzo step) non è nella posizione del veicolo analizzato
-                        continue
+                
 
                 target_forward_vector = target_transform.get_forward_vector()
                 target_extent = target_vehicle.bounding_box.extent.x
