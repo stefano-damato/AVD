@@ -16,7 +16,7 @@ from local_planner import LocalPlanner, RoadOption
 from global_route_planner import GlobalRoutePlanner
 from misc import (get_speed, is_within_distance,
                                get_trafficlight_trigger_location,
-                               compute_distance,draw_waypoints)
+                               compute_distance,draw_waypoints, compute_angle)
 # from perception.perfectTracker.gt_tracker import PerfectTracker
 
 class BasicAgent(object):
@@ -622,7 +622,6 @@ class BasicAgent(object):
                         (target_wpt.lane_id != next_wpt.lane_id  + lane_offset and                               #se non è sulla stessa strada o corsia
                         (target_wpt.lane_id != next_wpt.lane_id + 1 or get_speed(target_vehicle)!=0 or "vehicle" not in target_vehicle.type_id))):         #se non è un veicolo parcheggiato
                         continue
-                
 
                 target_forward_vector = target_transform.get_forward_vector()
                 target_extent = target_vehicle.bounding_box.extent.x
@@ -632,8 +631,36 @@ class BasicAgent(object):
                     y=target_extent * target_forward_vector.y,
                 )
 
-                if is_within_distance(target_rear_transform, ego_front_transform, max_distance, [low_angle_th, up_angle_th]):   #se la parte posteriore del veicolo è minore di una certa distanza
-                    return (True, target_vehicle, compute_distance(target_transform.location, ego_transform.location))      #possibile collisione
+                target_transform_front = target_vehicle.get_transform()
+                target_front_transform = target_transform_front        #parte anteriore del veicolo
+                target_front_transform.location += carla.Location(
+                    x=target_extent * target_forward_vector.x,
+                    y=target_extent * target_forward_vector.y,
+                )
+
+                distance_front = compute_distance(target_transform_front.location, ego_transform.location)
+                distance_rear = compute_distance(target_transform.location, ego_transform.location) 
+
+                # find the angle between the vehicles
+                angle = compute_angle(target_rear_transform, ego_front_transform)
+
+                if angle < 90:                                                      # ATTENZIONE! Facendo in questo modo, alcuni ostcoli già superati come biciclette (
+                                                                                    # che non hanno spessore) o oggetti statici che hanno una direzione opposta
+                                                                                    # a quella del senso di marcia, hanno un angolo maggiore di 90 gradi con la nostra direzione
+                                                                                    # e vengono quindi considerati anche per il sorpasso; nella overtake_manager però vengono considerati 
+                                                                                    # solo quelli tra 0 e 60 gradi, quindi questi ostacoli non vengono considerati, ma vengono considerati dal
+                                                                                    # car following manager (solo per alcuni istanti in quanto ci stiamo allontanando da essi)
+                    print("distance_front: ",distance_front)
+                    print("distance_rear: ", distance_rear)
+                    if is_within_distance(target_rear_transform, ego_front_transform, max_distance, [low_angle_th, up_angle_th]):
+                        print("rear transform")
+                        return (True, target_vehicle, compute_distance(target_transform.location, ego_transform.location))
+                else:
+                    print("distance_front: ",distance_rear)
+                    print("distance_rear: ", distance_front)
+                    if is_within_distance(target_rear_transform, ego_front_transform, max_distance, [90, 90+up_angle_th]) :   #se la parte posteriore del veicolo è minore di una certa distanza
+                        print("front transform")
+                        return (True, target_vehicle, compute_distance(target_transform_front.location, ego_transform.location))      #possibile collisione
 
             # Waypoints aren't reliable, check the proximity of the vehicle to the route
             # negli incroci non posso escludere oggetti che sono su altre strade o corsie

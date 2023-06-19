@@ -100,7 +100,19 @@ def is_within_distance(target_transform, reference_transform, max_distance, angl
     forward_vector = np.array([fwd.x, fwd.y])
     angle = math.degrees(math.acos(np.clip(np.dot(forward_vector, target_vector) / norm_target, -1., 1.)))
 
+    print("angle: ",angle)
     return min_angle < angle < max_angle
+
+def compute_angle(target_transform, reference_transform):
+    target_vector = np.array([
+        target_transform.location.x - reference_transform.location.x,
+        target_transform.location.y - reference_transform.location.y
+    ])
+    norm_target = np.linalg.norm(target_vector)
+    fwd = reference_transform.get_forward_vector()
+    forward_vector = np.array([fwd.x, fwd.y])
+    angle = math.degrees(math.acos(np.clip(np.dot(forward_vector, target_vector) / norm_target, -1., 1.)))
+    return angle
 
 
 def compute_magnitude_angle(target_location, current_location, orientation):
