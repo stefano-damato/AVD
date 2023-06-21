@@ -341,6 +341,22 @@ class LocalPlanner(object):
             except IndexError as i:
                 return None, RoadOption.VOID
 
+    def get_incoming_waypoints(self, steps=3):
+        """
+        Returns a list of waypoints within a distance ahead defined by the user.
+
+            :param steps: number of steps to get the incoming waypoint.
+        """
+        wpts = []
+        if len(self._waypoints_queue) < steps:
+            steps = len(self._waypoints_queue)
+        try:    
+            for i in range(steps):
+                wpts.append(self._waypoints_queue[i][0])
+            return wpts
+        except IndexError as i:
+            return None, RoadOption.VOID
+
     def get_plan(self):
         """Returns the current plan of the local planner"""
         return self._waypoints_queue

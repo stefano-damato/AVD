@@ -22,12 +22,13 @@ class Normal(object):
     speed_decrease = 10
     safety_time = 3
     min_proximity_threshold = 25
-    fixed_braking_distance = 4
     braking_distance = 4
     tailgate_counter = 0
     overtake_distance = 10
     safety_space_reentry = 4
     arriving_at_junction_speed = 20
+    overtake_velocity = 80
+    invading_velocity = 20
 
 
 class Aggressive(object):

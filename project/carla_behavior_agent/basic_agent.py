@@ -64,10 +64,9 @@ class BasicAgent(object):
         self._offset = 0
         self._overake_coverage = 0
         self._overtake = False
-        self._overtake_velocity = 80
         self._len_waypoints_queue_before_overatke = None
         self._old_wpt = None
-        self._black_list = ["vehicle.nissan.patrol_2021", "static.prop.dirtdebris01", "a"]      # la black list è formata da attori che non bisogna sorpassare:
+        self._black_list = ["vehicle.nissan.patrol_2021","vehicle.mini.cooper_s", "static.prop.dirtdebris01", "a"]      # la black list è formata da attori che non bisogna sorpassare:
                                                                                                 # o oggetti statici sulla nostra corsia o veicoli a bordo strada (la cui
                                                                                                 # lane id è uguale a quella di veicoli a metà corsia che invece bisogna sorpassare)  
         # Change parameters according to the dictionary
@@ -280,7 +279,6 @@ class BasicAgent(object):
             self._overake_coverage = len(path) + 3
             self._overtake = True
             self._len_waypoints_queue_before_overatke = len(self._local_planner._waypoints_queue)
-            self._behavior.max_speed = self._overtake_velocity
             #draw_waypoints(self._vehicle.get_world(), path)
         else:
             print("WARNING: Ignoring the lane change as no path was found")
@@ -611,16 +609,18 @@ class BasicAgent(object):
                 if (target_wpt.road_id != ego_wpt.road_id or
                         (target_vehicle.type_id in self._black_list and ("static" in target_vehicle.type_id or target_wpt.lane_id != ego_wpt.lane_id  + lane_offset) ) or       #della black list fanno parte o oggetti statici sulla mia corsia o veicoli su un'altra corsia
                         (target_wpt.lane_id != ego_wpt.lane_id  + lane_offset and                               #se non è sulla stessa strada o corsia
-                        (target_wpt.lane_id != ego_wpt.lane_id + 1 or get_speed(target_vehicle)!=0 or "vehicle" not in target_vehicle.type_id))):         #se non è un veicolo parcheggiato
+                        (target_wpt.lane_id != ego_wpt.lane_id + 1 or get_speed(target_vehicle)!=0 or "vehicle" not in target_vehicle.type_id) and      #se non è un veicolo parcheggiato
+                        (target_wpt.lane_id != ego_wpt.lane_id + 1 or "vehicle" not in target_vehicle.type_id or target_vehicle.attributes["base_type"]!="bicycle"))):         #se non è una bicicletta a bordo strada; in scenario1 non c'è bisogno di questo controllo
                     next_wpt = self._local_planner.get_incoming_waypoint_and_direction(steps=3)[0]
                     next_wpt = self._local_planner.get_incoming_waypoint_and_direction(steps=3)[0]  # si può applicare un controllo migliore sulla frenata
                     # if target_vehicle.type_id in self._black_list or not next_wpt or target_wpt.road_id != next_wpt.road_id or target_wpt.lane_id != next_wpt.lane_id  + lane_offset:#se dove voglio andare (terzo step) non è nella posizione del veicolo analizzato
 
                     if (not next_wpt or
-                        target_wpt.road_id != next_wpt.road_id or
-                        (target_vehicle.type_id in self._black_list and ("static" in target_vehicle.type_id or target_wpt.lane_id != next_wpt.lane_id  + lane_offset) ) or       #della black list fanno parte o oggetti statici sulla mia corsia o veicoli su un'altra corsia
-                        (target_wpt.lane_id != next_wpt.lane_id  + lane_offset and                               #se non è sulla stessa strada o corsia
-                        (target_wpt.lane_id != next_wpt.lane_id + 1 or get_speed(target_vehicle)!=0 or "vehicle" not in target_vehicle.type_id))):         #se non è un veicolo parcheggiato
+                            target_wpt.road_id != next_wpt.road_id or
+                            (target_vehicle.type_id in self._black_list and ("static" in target_vehicle.type_id or target_wpt.lane_id != next_wpt.lane_id  + lane_offset) ) or       #della black list fanno parte o oggetti statici sulla mia corsia o veicoli su un'altra corsia
+                            (target_wpt.lane_id != next_wpt.lane_id  + lane_offset and                               #se non è sulla stessa strada o corsia
+                            (target_wpt.lane_id != next_wpt.lane_id + 1 or get_speed(target_vehicle)!=0 or "vehicle" not in target_vehicle.type_id) and      #se non è un veicolo parcheggiato
+                            (target_wpt.lane_id != ego_wpt.lane_id + 1 or "vehicle" not in target_vehicle.type_id or target_vehicle.attributes["base_type"]!="bicycle"))):         #se non è una bicicletta a bordo strada; in scenario1 non c'è bisogno di questo controllo
                         continue
 
                 target_forward_vector = target_transform.get_forward_vector()
@@ -650,16 +650,10 @@ class BasicAgent(object):
                                                                                     # e vengono quindi considerati anche per il sorpasso; nella overtake_manager però vengono considerati 
                                                                                     # solo quelli tra 0 e 60 gradi, quindi questi ostacoli non vengono considerati, ma vengono considerati dal
                                                                                     # car following manager (solo per alcuni istanti in quanto ci stiamo allontanando da essi)
-                    print("distance_front: ",distance_front)
-                    print("distance_rear: ", distance_rear)
                     if is_within_distance(target_rear_transform, ego_front_transform, max_distance, [low_angle_th, up_angle_th]):
-                        print("rear transform")
                         return (True, target_vehicle, compute_distance(target_transform.location, ego_transform.location))
                 else:
-                    print("distance_front: ",distance_rear)
-                    print("distance_rear: ", distance_front)
                     if is_within_distance(target_rear_transform, ego_front_transform, max_distance, [90, 90+up_angle_th]) :   #se la parte posteriore del veicolo è minore di una certa distanza
-                        print("front transform")
                         return (True, target_vehicle, compute_distance(target_transform_front.location, ego_transform.location))      #possibile collisione
 
             # Waypoints aren't reliable, check the proximity of the vehicle to the route

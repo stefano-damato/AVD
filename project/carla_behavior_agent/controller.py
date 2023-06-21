@@ -45,6 +45,7 @@ class VehicleController():
         self.max_brake = max_brake
         self.max_throt = max_throttle
         self.max_steer = max_steering
+        self._steer = 0
 
         self._vehicle = vehicle
         self._world = self._vehicle.get_world()
@@ -101,6 +102,8 @@ class VehicleController():
         else:
             control.throttle = 0.0
             control.brake = min(abs(acceleration), self.max_brake)
+
+        self._steer = steering
 
         print("speed: ", get_speed(self._vehicle), "steering: ", steering)
         return control
@@ -261,7 +264,15 @@ class StanleyLateralController():
         # Get Target Waypoint
         ce_idx = self._get_lookahead_index(ego_loc,self._lookahead_distance)
         desired_x = self._wps[ce_idx][0].transform.location.x
-        desired_y = self._wps[ce_idx][0].transform.location.y + self._offset
+        desired_y = self._wps[ce_idx][0].transform.location.y
+
+        #print("Offset: ", self._offset)
+        if abs(observed_heading) > 3.14/2:
+            print("Verso il basso ", self._offset)
+            desired_y = desired_y + self._offset
+        else:
+            print("Verso l'alto ", self._offset)
+            desired_y = desired_y - self._offset        #in scenario1 basta solo il più (l'offset dipende dall'orientamento del veicolo)
         
         # Get Target Heading
         if ce_idx < len(self._wps)-1:
