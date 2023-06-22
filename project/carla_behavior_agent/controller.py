@@ -268,10 +268,8 @@ class StanleyLateralController():
 
         #print("Offset: ", self._offset)
         if abs(observed_heading) > 3.14/2:
-            print("Verso il basso ", self._offset)
             desired_y = desired_y + self._offset
         else:
-            print("Verso l'alto ", self._offset)
             desired_y = desired_y - self._offset        #in scenario1 basta solo il più (l'offset dipende dall'orientamento del veicolo)
         
         # Get Target Heading

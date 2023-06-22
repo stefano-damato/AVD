@@ -138,7 +138,7 @@ class BehaviorAgent(BasicAgent):
 
         return affected
     
-    def compute_safe_distance(self, speed):#calcolo della distanza di sicurezza,vista su google
+    def compute_safe_distance(self, speed):     #calcolo della distanza di sicurezza,vista su google
 
         safe_distance = (speed * speed) / 152
         return (safe_distance)
@@ -339,7 +339,7 @@ class BehaviorAgent(BasicAgent):
         actor_location = actor_location + carla.Location(actor_vector[0], actor_vector[1])
         actor_yaw = actor_transform.rotation.yaw
 
-        if(len(world_actors) != 0):
+        if len(world_actors) != 0:
             is_hazard = False
             for adversary in world_actors:
                 adversary_wp = self._map.get_waypoint(adversary.get_location())
@@ -368,11 +368,11 @@ class BehaviorAgent(BasicAgent):
                         is_hazard = True
                         return  (is_hazard, adversary)
                     
-            return (is_hazard, None)
+            #return (is_hazard, None)
         return(False, None)
     
     
-    def stop_manager(self):#stessa cosa di traffic light ma si occupa degli stop
+    def stop_manager(self):      #stessa cosa di traffic light ma si occupa degli stop
 
         actor_list = self._world.get_actors()
         stop_list = actor_list.filter("*stop*")
@@ -427,7 +427,7 @@ class BehaviorAgent(BasicAgent):
                 print("ho visto lo stop")
                 return self.emergency_stop()
             else:
-                if self._current_stop.id != self._control_dict["stop"].id:#mi salvo l'id dello stop per evitare che il sistema veda 2 volte lo stesso stop
+                if self._current_stop.id != self._control_dict["stop"].id:      #mi salvo l'id dello stop per evitare che il sistema veda 2 volte lo stesso stop
                     self._count_stop = 1
                     print("ho visto lo stop")
                     return self.emergency_stop()
@@ -475,8 +475,9 @@ class BehaviorAgent(BasicAgent):
 
         # 3: Intersection behavior
 
-        elif ego_vehicle_wp.is_junction and (self._incoming_direction in [RoadOption.LEFT, RoadOption.RIGHT, RoadOption.STRAIGHT]) and not self._ignore_junction:# la self.ignor.... è una variabile che viene settata a true
-            is_hazard, junction_vehicle = self.detect_lane_obstacle(ego_vehicle_wp=ego_vehicle_wp)                                  #quando l'incrocio è gestito dal semaforo
+        elif ego_vehicle_wp.is_junction and (self._incoming_direction in [RoadOption.LEFT, RoadOption.RIGHT, RoadOption.STRAIGHT]) and not self._ignore_junction:       # la self.ignor.... è una variabile che viene settata a true
+                                                                                                                                                                        # quando l'incrocio è gestito dal semaforo
+            is_hazard, junction_vehicle = self.detect_lane_obstacle(ego_vehicle_wp=ego_vehicle_wp)                                                                      
             if is_hazard:
                 print("mi interseco con il veicolo",junction_vehicle)
                 return self.emergency_stop_junction()

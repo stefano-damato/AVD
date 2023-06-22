@@ -6,6 +6,8 @@ import time
 import base64
 import matplotlib
 from matplotlib import pyplot as plt
+import shapely.geometry
+import shapely.affinity
 
 def threaded(func):
     def wrapper(*k, **kw):
@@ -168,3 +170,33 @@ class Streamer():
 if __name__ == "__main__":
     speed_plot = Plot("./userCode/speed.txt", "./userCode/speedplot.png")
     speed_plot.plot()
+
+
+class RotatedRectangle(object):
+
+    """
+    This class contains method to draw rectangle and find intersection point.
+    """
+
+    def __init__(self, c_x, c_y, width, height, angle):
+        self.c_x = c_x
+        self.c_y = c_y
+        self.w = width      # pylint: disable=invalid-name
+        self.h = height     # pylint: disable=invalid-name
+        self.angle = angle
+
+    def get_contour(self):
+        """
+        create contour
+        """
+        w = self.w
+        h = self.h
+        c = shapely.geometry.box(-w / 2.0, -h / 2.0, w / 2.0, h / 2.0)
+        rc = shapely.affinity.rotate(c, self.angle)
+        return shapely.affinity.translate(rc, self.c_x, self.c_y)
+
+    def intersection(self, other):
+        """
+        Obtain a intersection point between two contour.
+        """
+        return self.get_contour().intersection(other.get_contour())

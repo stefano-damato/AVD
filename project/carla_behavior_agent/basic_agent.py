@@ -68,7 +68,14 @@ class BasicAgent(object):
         self._old_wpt = None
         self._black_list = ["vehicle.nissan.patrol_2021","vehicle.mini.cooper_s", "static.prop.dirtdebris01", "a"]      # la black list è formata da attori che non bisogna sorpassare:
                                                                                                 # o oggetti statici sulla nostra corsia o veicoli a bordo strada (la cui
-                                                                                                # lane id è uguale a quella di veicoli a metà corsia che invece bisogna sorpassare)  
+                                                                                              # lane id è uguale a quella di veicoli a metà corsia che invece bisogna sorpassare)  
+        self._lane_vehicle_left = False
+        self._lane_vehicle_right = False
+        self._lane_vehicle_c = True
+        self._track_distance = {}
+        self._count_vehicles = 0
+        self._last_traffic_light_distance = 0
+
         # Change parameters according to the dictionary
         if 'target_speed' in opt_dict:
             self._target_speed = opt_dict['target_speed']
@@ -409,6 +416,7 @@ class BasicAgent(object):
             :param max_distance (float): max distance for traffic lights to be considered relevant.
                 If None, the base threshold value is used
         """
+
         if self._ignore_traffic_lights:
             return (False, None)
 
@@ -441,6 +449,7 @@ class BasicAgent(object):
             if trigger_wp.road_id != ego_vehicle_waypoint.road_id:
                 continue
 
+            
             ve_dir = ego_vehicle_waypoint.transform.get_forward_vector()
             wp_dir = trigger_wp.transform.get_forward_vector()
             dot_ve_wp = ve_dir.x * wp_dir.x + ve_dir.y * wp_dir.y + ve_dir.z * wp_dir.z
@@ -448,14 +457,119 @@ class BasicAgent(object):
             if dot_ve_wp < 0:
                 continue
 
-            if traffic_light.state != carla.TrafficLightState.Red:
+            if traffic_light.state == carla.TrafficLightState.Green:
+                print("GREEN Traffic Light")
                 continue
 
-            if is_within_distance(trigger_wp.transform, self._vehicle.get_transform(), max_distance, [0, 90]):
+            if is_within_distance(trigger_wp.transform, self._vehicle.get_transform(), max_distance, [0, 180]):
+                print("ciao bro")
                 self._last_traffic_light = traffic_light
                 return (True, traffic_light)
 
         return (False, None)
+    
+    def _affected_by_traffic_light_junction(self, lights_list=None, max_distance=None):
+        """
+        Method to check if there is a red light affecting the vehicle.
+
+            :param lights_list (list of carla.TrafficLight): list containing TrafficLight objects.
+                If None, all traffic lights in the scene are used
+            :param max_distance (float): max distance for traffic lights to be considered relevant.
+                If None, the base threshold value is used
+        """
+
+        if self._ignore_traffic_lights:
+            return (False, None)
+
+        if not lights_list:
+            lights_list = self._world.get_actors().filter("*traffic_light*")
+
+        if not max_distance:
+            max_distance = self._base_tlight_threshold
+
+        ego_vehicle_location = self._vehicle.get_location()
+        ego_vehicle_waypoint = self._map.get_waypoint(ego_vehicle_location)
+
+        for traffic_light in lights_list:
+            if traffic_light.id in self._lights_map:
+                trigger_wp = self._lights_map[traffic_light.id]
+            else:
+                trigger_location = get_trafficlight_trigger_location(traffic_light)
+                trigger_wp = self._map.get_waypoint(trigger_location)
+                self._lights_map[traffic_light.id] = trigger_wp
+
+            if trigger_wp.transform.location.distance(ego_vehicle_location) > max_distance:
+                continue
+
+            if trigger_wp.road_id != ego_vehicle_waypoint.road_id:
+                continue
+
+            if is_within_distance(trigger_wp.transform, self._vehicle.get_transform(), max_distance, [0, 180]):
+                return (True, traffic_light)
+
+        return (False, None)
+    def check_behind(self, target_vehicle, distance):
+
+        if not target_vehicle:
+            return False
+        
+        target_vehicle_id = target_vehicle.id
+        
+        if self._track_distance.get(target_vehicle_id) is None:
+            self._track_distance[target_vehicle_id] = distance
+            return False
+        elif self._track_distance[target_vehicle_id] >= distance:
+            self._track_distance[target_vehicle_id] = distance
+            return False
+        else:
+            difference = distance - self._track_distance[target_vehicle_id]
+            if difference >= 2:
+                self._track_distance[target_vehicle_id] = -1
+                return True
+            else:
+                return False
+    
+    def affected_by_stop(self, stop_list = None, max_distance=None):
+        if not max_distance:
+            max_distance = self._base_tlight_threshold
+
+        if not stop_list:
+            stop_list = self._world.get_actors().filter("*stop*")
+
+        
+        ego_vehicle_location = self._vehicle.get_location()
+        ego_vehicle_waypoint = self._map.get_waypoint(ego_vehicle_location)
+
+        for stop in stop_list:
+            if(stop.id in self._stops_map):
+                trigger_wp = self._stops_map[stop.id]
+            else:
+                trigger_location = get_trafficlight_trigger_location(stop)
+                trigger_wp = self._map.get_waypoint(trigger_location)
+                self._stops_map[stop.id] = trigger_wp
+            
+
+            if trigger_wp.transform.location.distance(ego_vehicle_location) > max_distance:
+                continue
+
+            distance = trigger_wp.transform.location.distance(ego_vehicle_location)
+
+            if trigger_wp.road_id != ego_vehicle_waypoint.road_id or trigger_wp.road_id != ego_vehicle_waypoint.road_id:
+                continue
+
+            ve_dir = ego_vehicle_waypoint.transform.get_forward_vector()
+            wp_dir = trigger_wp.transform.get_forward_vector()
+            dot_ve_wp = ve_dir.x * wp_dir.x + ve_dir.y * wp_dir.y + ve_dir.z * wp_dir.z
+
+            # se il segnale di stop sta dietro si ignora
+            if dot_ve_wp < 0:
+                continue
+            
+            if is_within_distance(trigger_wp.transform, self._vehicle.get_transform(), max_distance, [0, 90]):
+                return (True, stop, distance)
+            
+        
+        return(False, None, -1)
 
     def _vehicle_obstacle_detected_old(self, vehicle_list=None, max_distance=None, up_angle_th=90, low_angle_th=0, lane_offset=0):
         """
