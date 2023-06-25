@@ -89,7 +89,9 @@ class VehicleController():
         if not overtake and abs(control.steer) > 0.1:
             if get_speed(self._vehicle) > 40:
                 target_speed = target_speed/6
-            elif get_speed(self._vehicle) > 21:
+            elif get_speed(self._vehicle) > 19:
+                target_speed = target_speed/3
+            elif get_speed(self._vehicle) > 10:
                 target_speed = target_speed/2
 
         print("target speed controller: ", target_speed)

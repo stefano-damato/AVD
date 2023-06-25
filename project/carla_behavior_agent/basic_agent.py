@@ -308,23 +308,6 @@ class BasicAgent(object):
         option = RoadOption.LANEFOLLOW
 
         # Same lane
-        """distance = 0
-        while distance < distance_same_lane:
-            next_wps = plan[-1][0].next(step_distance)      # take the waypoint at step_distance distance 
-            if not next_wps:
-                return []
-            next_wp = next_wps[0]
-            distance += next_wp.transform.location.distance(plan[-1][0].transform.location)
-            #print("DISATNCE same lane: ", distance)
-            plan.append((next_wp, RoadOption.LANEFOLLOW))
-
-        if direction == 'left':
-            option = RoadOption.CHANGELANELEFT
-        elif direction == 'right':
-            option = RoadOption.CHANGELANERIGHT
-        else:
-            print("ERROR, input value for change must be 'left' or 'right'")
-            return []"""
 
         lane_changes_done = 0
         lane_change_distance = lane_change_distance / lane_changes
@@ -364,7 +347,6 @@ class BasicAgent(object):
                 return []
             next_wp = next_wps[0]
             distance += next_wp.transform.location.distance(plan[-1][0].transform.location)
-            #print("DISATNCE other lane: ", distance)
             plan.append((next_wp, RoadOption.LANEFOLLOW))
 
         
@@ -402,7 +384,6 @@ class BasicAgent(object):
             return []
         next_wp = next_wps[0]
         distance += next_wp.transform.location.distance(plan[-1][0].transform.location)
-        #print("DISATNCE other lane: ", distance)
         plan.append((next_wp, RoadOption.LANEFOLLOW))
         
         return plan 
@@ -462,7 +443,6 @@ class BasicAgent(object):
                 continue
 
             if is_within_distance(trigger_wp.transform, self._vehicle.get_transform(), max_distance, [0, 180]):
-                print("ciao bro")
                 self._last_traffic_light = traffic_light
                 return (True, traffic_light)
 
@@ -677,7 +657,7 @@ class BasicAgent(object):
 
         return (False, None, -1)
     
-    def _vehicle_obstacle_detected(self, vehicle_list=None, max_distance=None, up_angle_th=90, low_angle_th=0, lane_offset=0):
+    def _vehicle_obstacle_detected(self, vehicle_list=None, max_distance=None, up_angle_th=90, low_angle_th=0, lane_offset=0, from_walker = False):
         """
         Method to check if there is a vehicle (any object) in front of the agent blocking its path.
 
@@ -701,6 +681,8 @@ class BasicAgent(object):
         ego_transform = self._vehicle.get_transform()
         ego_wpt = self._map.get_waypoint(self._vehicle.get_location())
 
+        wpt0 = self._local_planner.get_incoming_waypoint_and_direction(steps=0)[0]
+
         # Get the right offset
         if ego_wpt.lane_id < 0 and lane_offset != 0:
             lane_offset *= -1
@@ -715,26 +697,31 @@ class BasicAgent(object):
         )
         for target_vehicle in vehicle_list:
 
+            #print(target_vehicle.type_id, dist(target_vehicle), self._map.get_waypoint(target_vehicle.get_transform().location, lane_type=carla.LaneType.Any).lane_id, self._map.get_waypoint(target_vehicle.get_transform().location, lane_type=carla.LaneType.Any).road_id)
+
+
             target_transform = target_vehicle.get_transform() #dove si trova il veicolo
             target_wpt = self._map.get_waypoint(target_transform.location, lane_type=carla.LaneType.Any) #acquisisci la posizione in forma di waypoint perchè dà informazioni anche sulla corsia
 
             # Simplified version for outside junctions (se non si è negli incroci)
             if not ego_wpt.is_junction or not target_wpt.is_junction:
-                if (target_wpt.road_id != ego_wpt.road_id or
+                if ((target_wpt.road_id != ego_wpt.road_id or
                         (target_vehicle.type_id in self._black_list and ("static" in target_vehicle.type_id or target_wpt.lane_id != ego_wpt.lane_id  + lane_offset) ) or       #della black list fanno parte o oggetti statici sulla mia corsia o veicoli su un'altra corsia
                         (target_wpt.lane_id != ego_wpt.lane_id  + lane_offset and                               #se non è sulla stessa strada o corsia
                         (target_wpt.lane_id != ego_wpt.lane_id + 1 or get_speed(target_vehicle)!=0 or "vehicle" not in target_vehicle.type_id) and      #se non è un veicolo parcheggiato
-                        (target_wpt.lane_id != ego_wpt.lane_id + 1 or "vehicle" not in target_vehicle.type_id or target_vehicle.attributes["base_type"]!="bicycle"))):         #se non è una bicicletta a bordo strada; in scenario1 non c'è bisogno di questo controllo
+                        (target_wpt.lane_id != ego_wpt.lane_id + 1 or "vehicle" not in target_vehicle.type_id or target_vehicle.attributes["base_type"]!="bicycle"))) and         #se non è una bicicletta a bordo strada; in scenario1 non c'è bisogno di questo controllo
+                        (not from_walker or "walker" not in target_vehicle.type_id)):
                     next_wpt = self._local_planner.get_incoming_waypoint_and_direction(steps=3)[0]
                     next_wpt = self._local_planner.get_incoming_waypoint_and_direction(steps=3)[0]  # si può applicare un controllo migliore sulla frenata
                     # if target_vehicle.type_id in self._black_list or not next_wpt or target_wpt.road_id != next_wpt.road_id or target_wpt.lane_id != next_wpt.lane_id  + lane_offset:#se dove voglio andare (terzo step) non è nella posizione del veicolo analizzato
 
-                    if (not next_wpt or
+                    if ((not next_wpt or
                             target_wpt.road_id != next_wpt.road_id or
                             (target_vehicle.type_id in self._black_list and ("static" in target_vehicle.type_id or target_wpt.lane_id != next_wpt.lane_id  + lane_offset) ) or       #della black list fanno parte o oggetti statici sulla mia corsia o veicoli su un'altra corsia
                             (target_wpt.lane_id != next_wpt.lane_id  + lane_offset and                               #se non è sulla stessa strada o corsia
                             (target_wpt.lane_id != next_wpt.lane_id + 1 or get_speed(target_vehicle)!=0 or "vehicle" not in target_vehicle.type_id) and      #se non è un veicolo parcheggiato
-                            (target_wpt.lane_id != ego_wpt.lane_id + 1 or "vehicle" not in target_vehicle.type_id or target_vehicle.attributes["base_type"]!="bicycle"))):         #se non è una bicicletta a bordo strada; in scenario1 non c'è bisogno di questo controllo
+                            (target_wpt.lane_id != ego_wpt.lane_id + 1 or "vehicle" not in target_vehicle.type_id or target_vehicle.attributes["base_type"]!="bicycle"))) and         #se non è una bicicletta a bordo strada; in scenario1 non c'è bisogno di questo controllo
+                            (not from_walker or "walker" not in target_vehicle.type_id)):
                         continue
 
                 target_forward_vector = target_transform.get_forward_vector()
@@ -819,7 +806,6 @@ class BasicAgent(object):
                         return (True, target_vehicle, compute_distance(target_vehicle.get_location(), ego_location))
 
                 return (False, None, -1)
-
         return (False, None, -1)
 
     
