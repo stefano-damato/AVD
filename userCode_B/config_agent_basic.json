@@ -13,5 +13,5 @@
             {"type": "sensor.speedometer", "id": "Speed"}
     ],
     "target_speed": 30.0,
-    "Visualizer_IP" : "192.168.1.21"
+    "Visualizer_IP" : ""
 }
