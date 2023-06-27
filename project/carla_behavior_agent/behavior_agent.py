@@ -104,12 +104,6 @@ class BehaviorAgent(BasicAgent):
         if self._incoming_direction is None:
             self._incoming_direction = RoadOption.LANEFOLLOW
 
-        if self._overtake_counter == -1:                 # 1 per lo scenario1; 0 per lo scenario0; -1 per tutti gli altri (per la gestione delle prime biciclette che si incontrano)
-            self._finish_overtake_margin = 10
-            self._local_planner.change_lateral_controller(kv=1.1)   #1.1 per lo scenario1
-        elif self._overtake_counter == 2:
-            self._local_planner.change_lateral_controller(kv=self._local_planner._args_lateral_dict["K_V"])
-            self._finish_overtake_margin = 3
 
         # emergency stop for a long time
         if self._emergency_stop_counter > 200:
@@ -324,64 +318,6 @@ class BehaviorAgent(BasicAgent):
 
         return control
 
-    def overtake_manager_old(self, lane_offset = 1 ):
-
-        ego_wpt = self._map.get_waypoint(self._vehicle.get_location())
-        
-        vehicle_list = self._world.get_actors().filter("*vehicle*")
-        static_ob_list = self._world.get_actors().filter("*static*")
-
-        horizon = 100
-
-        # list of object to overtake
-        ob_list = [v for v in static_ob_list if is_within_distance(v.get_transform(), self._vehicle.get_transform(), horizon, [0,60])     # se l'ggetto è avanti a noi ad una distanza massima
-                                                and v.id != self._vehicle.id
-                                                and ego_wpt.lane_id == self._map.get_waypoint(v.get_transform().location, lane_type=carla.LaneType.Any).lane_id]      # se l'oggetto è nella nostra stessa corsia
-        
-        def dist(v): return v.get_location().distance(self._vehicle.get_transform().location)
-        ob_list.sort(key=lambda x:dist(x))
-
-        # search for the first location in which perform the reentry
-        search_for_reentry = True
-        safety_distance_for_reentry = self._vehicle.bounding_box.extent.x*2 + self._behavior.safety_space_reentry
-        i = 0
-        while search_for_reentry:
-            if i == len(ob_list)-1:
-                break
-            ob1_length = ob_list[i].bounding_box.extent.x
-            ob2_length = ob_list[i+1].bounding_box.extent.x
-            #print("distance between objects: ", distance_between_objects)
-            if distance_between_objects > safety_distance_for_reentry:
-                break
-            i+=1
-            
-        other_line_distance = compute_distance(ob_list[i].get_transform().location, self._vehicle.get_transform().location) + ob_list[i].bounding_box.extent.x + self._behavior.safety_space_reentry/2
-
-        target_line_id =  ego_wpt.lane_id + lane_offset
-        target_line_id = target_line_id if target_line_id != 0 else target_line_id + 1      # 0 is the central lane
-
-        # list of vehicle on the lane in wihch we have to move
-        ob_list = [v for v in vehicle_list if is_within_distance(v.get_transform(), self._vehicle.get_transform(), horizon, [0,90])     # se l'ggetto è avanti a noi ad una distanza massima
-                                                and v.id != self._vehicle.id
-                                                and target_line_id == self._map.get_waypoint(v.get_transform().location, lane_type=carla.LaneType.Any).lane_id]      # se l'oggetto è nella corsia desiderata
-                        
-        ob_list.sort(key=lambda x:dist(x))
-
-        other_line_time = other_line_distance/(self._behavior.max_speed/2)  #time spent on the other line is estimed to be calculated on target velocity/2
-        
-        if len(ob_list) == 0:
-            return True, other_line_distance
-        target_vehicle = ob_list[0]
-        target_vehicle_distance = dist(target_vehicle)
-
-        if target_vehicle_distance > other_line_distance:
-            target_vehicle_velocity = get_speed(target_vehicle)
-            target_vehicle_time = (target_vehicle_distance-other_line_distance)/target_vehicle_velocity
-            if target_vehicle_time > other_line_time:
-                return True, other_line_distance
-
-        return False, 0
-
     def overtake_manager(self, lane_offset = 1):
 
         ego_wpt = self._map.get_waypoint(self._vehicle.get_location())
@@ -441,10 +377,10 @@ class BehaviorAgent(BasicAgent):
         up_angle_th = 30
         # list of vehicle on the lane in wihch we have to move
         ob_list = []
-        overtake_wpts = self._local_planner.get_incoming_waypoints(int(total_overtake_distance))        #in scenario1 non c'è bisogno di questo controllo
+        overtake_wpts = self._local_planner.get_incoming_waypoints(int(total_overtake_distance))        
         for wpt in overtake_wpts:
             angle = compute_angle(ego_wpt.transform, wpt.transform)
-            if angle < 174.5:       #misurato sperimentalmente
+            if angle < 174.5:       # misurato sperimentalmente
                 up_angle_th = 90
                 break
 
@@ -501,7 +437,7 @@ class BehaviorAgent(BasicAgent):
         ego_wpt = self._map.get_waypoint(self._vehicle.get_location())
         vehicle_list = self._world.get_actors().filter("*vehicle*")
         def dist(v): return v.get_location().distance(self._vehicle.get_transform().location)
-        horizon = 20            # in scenario1 20
+        horizon = 20          
 
         if ego_wpt.lane_id < 0:
             target_line_id =  ego_wpt.lane_id + lane_offset
@@ -530,8 +466,8 @@ class BehaviorAgent(BasicAgent):
 
             disalignment = compute_distance(exact_location, projected_waypoint.transform.location)
             
-            self._local_planner.set_lateral_offset(-2*disalignment)              # in scenario1: -2*disalignment senza altri controlli
-            if disalignment > 0.5:                                               # in scenario1: non c'è bisogno di questi ulteriori controlli   
+            self._local_planner.set_lateral_offset(-2*disalignment)              
+            if disalignment > 0.5:                                                 
                 self._behavior.max_speed = self._behavior.invading_velocity
     
 
@@ -575,7 +511,7 @@ class BehaviorAgent(BasicAgent):
                             2 * margin * actor_bbox.extent.x * 2, 2 * margin * actor_bbox.extent.y*extension_factor_actor, actor_yaw)
                     overlap_area = overlap_adversary.intersection(overlap_actor).area
                     speed_adv = get_speed(adversary)
-                    if overlap_area > 0 and  speed_adv > 5: #perchè 
+                    if overlap_area > 0 and  speed_adv > 5:
                         is_hazard = True
                         return  (is_hazard, adversary)
                     
@@ -598,12 +534,12 @@ class BehaviorAgent(BasicAgent):
         """
         actor_list = self._world.get_actors()
         lights_list = actor_list.filter("*traffic_light*")
-        affected, traffic_light = self._affected_by_traffic_light_junction(lights_list, max_distance=16)#vede se si trova un semaforo ad un 
-                                                                                                        #max di 16 metri e se c'è me lo ritorna
+        affected, traffic_light = self._affected_by_traffic_light_junction(lights_list, max_distance=16)
+                                                                                                        
 
         if traffic_light is not None:
             self._control_dict["traffic_light"] = traffic_light
-            self._ignore_junction = True  #c'è un semaforo e non c'è uno stop e quindi l'intersezione viene gestita con il semaforo e non con la lane obstacle
+            self._ignore_junction = True  #c'è un semaforo e quindi l'intersezione viene gestita con il semaforo e non con la gestione degli stop
 
         return affected
         
@@ -617,7 +553,6 @@ class BehaviorAgent(BasicAgent):
         stop_list = actor_list.filter("*stop*")
 
         max_distance = self.compute_safe_distance(self._speed + 4)
-        #max_distance = 2*(get_speed(self._vehicle)/10)**2
         affected, stop, distance = self.affected_by_stop(stop_list, max_distance)
 
         self._control_dict["stop"] = stop
@@ -726,7 +661,7 @@ class BehaviorAgent(BasicAgent):
                     print("\nSTART OVERTAKE\n")
                     self._behavior.max_speed = self._behavior.overtake_velocity
                     self._local_planner.set_lateral_offset(-0.6)
-                    self.lane_change('left', 0, other_line_distance-self._lane_change_distance, self._lane_change_distance) #-4 perchè 1 metro viene fatto sulla stessa corsia e 3 metro nel cambio corsia
+                    self.lane_change('left', 0, other_line_distance-self._lane_change_distance, self._lane_change_distance) 
                     target_speed = self._behavior.max_speed
                     self._local_planner.set_speed(target_speed)
                     control = self._local_planner.run_step(debug=debug, overtake=self._overtake)  
@@ -745,7 +680,7 @@ class BehaviorAgent(BasicAgent):
             print("INTERSECTION BEHAVIOR")
             if self._junction_wpt is not None:
                 self._junction_wpt = None
-            is_hazard, junction_vehicle = self.detect_lane_obstacle(ego_vehicle_wp=ego_vehicle_wp)                                  #quando l'incrocio è gestito dal semaforo
+            is_hazard, junction_vehicle = self.detect_lane_obstacle(ego_vehicle_wp=ego_vehicle_wp)                                 
             if is_hazard:
                 return self.emergency_stop(brake=0.75)
             else:
