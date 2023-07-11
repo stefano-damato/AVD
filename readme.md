@@ -1,4 +1,4 @@
-# AVD
+# Autonomous Vehicle Driving System on CARLA
 The repo contains code and report for the university exam *Autonomous Vehicle Driving*.
 
 The purpose of this project is to deisgn, implement and evaluate an autonomous driving system that respects as much as possible the road rules.
